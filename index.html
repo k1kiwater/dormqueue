@@ -1,0 +1,4298 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>宿速排 DormQueue｜宿舍淋浴與洗衣即時預約系統</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Noto Sans TC"', '"Inter"', 'sans-serif'],
+            mono: ['"Inter"', 'monospace']
+          },
+          keyframes: {
+            toastIn: {
+              '0%': { transform: 'translateX(16px)', opacity: '0' },
+              '100%': { transform: 'translateX(0)', opacity: '1' }
+            },
+            toastOut: {
+              '0%': { opacity: '1' },
+              '100%': { opacity: '0', transform: 'translateY(-6px)' }
+            },
+            modalIn: {
+              '0%': { opacity: '0', transform: 'scale(0.97) translateY(6px)' },
+              '100%': { opacity: '1', transform: 'scale(1) translateY(0)' }
+            }
+          },
+          animation: {
+            'toast-in': 'toastIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+            'toast-out': 'toastOut 0.2s ease-in forwards',
+            'modal-in': 'modalIn 0.18s ease-out forwards'
+          }
+        }
+      }
+    };
+  </script>
+  <script>
+    // 首屏渲染前即時套用儲存或系統偏好的深淺色主題，避免畫面閃爍
+    (function () {
+      try {
+        const savedTheme = localStorage.getItem('dormqueue_theme');
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const initialTheme = savedTheme === 'dark' || savedTheme === 'light' ? savedTheme : (prefersDark ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', initialTheme);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
+  <style>
+    :root {
+      --bg-page: #F8FAFC;
+      --bg-card: #FFFFFF;
+      --bg-header: rgba(255, 255, 255, 0.94);
+      --bg-subtle: #F1F5F9;
+      --bg-subtler: #F8FAFC;
+      --bg-input: #FFFFFF;
+      --border-color: #E2E8F0;
+      --border-subtle: #F1F5F9;
+      --text-primary: #0F172A;
+      --text-secondary: #334155;
+      --text-muted: #64748B;
+      --text-faint: #94A3B8;
+      color-scheme: light;
+    }
+
+    [data-theme="dark"] {
+      --bg-page: #0F172A;
+      --bg-card: #1E293B;
+      --bg-header: rgba(30, 41, 59, 0.94);
+      --bg-subtle: #0F172A;
+      --bg-subtler: rgba(15, 23, 42, 0.65);
+      --bg-input: #0F172A;
+      --border-color: #334155;
+      --border-subtle: #293548;
+      --text-primary: #F1F5F9;
+      --text-secondary: #E2E8F0;
+      --text-muted: #94A3B8;
+      --text-faint: #64748B;
+      color-scheme: dark;
+    }
+
+    body,
+    header,
+    section,
+    article,
+    div,
+    button,
+    input,
+    select,
+    textarea {
+      transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    }
+
+    body {
+      background-color: var(--bg-page);
+      color: var(--text-primary);
+    }
+
+    /* 深色模式表面與邊框系統調校 */
+    [data-theme="dark"] .bg-\[\#F8FAFC\] {
+      background-color: var(--bg-page) !important;
+    }
+
+    [data-theme="dark"] .bg-white {
+      background-color: var(--bg-card) !important;
+    }
+
+    [data-theme="dark"] .bg-white\/95 {
+      background-color: var(--bg-header) !important;
+    }
+
+    [data-theme="dark"] .bg-slate-50,
+    [data-theme="dark"] .bg-slate-50\/70,
+    [data-theme="dark"] .bg-slate-50\/60 {
+      background-color: var(--bg-subtler) !important;
+    }
+
+    [data-theme="dark"] .bg-slate-100,
+    [data-theme="dark"] .bg-slate-200\/70 {
+      background-color: var(--bg-subtle) !important;
+    }
+
+    [data-theme="dark"] .border-\[\#E2E8F0\],
+    [data-theme="dark"] .border-slate-200,
+    [data-theme="dark"] .border-slate-200\/80,
+    [data-theme="dark"] .border-slate-200\/70,
+    [data-theme="dark"] .border-slate-300 {
+      border-color: var(--border-color) !important;
+    }
+
+    [data-theme="dark"] .border-slate-100,
+    [data-theme="dark"] .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+      border-color: var(--border-subtle) !important;
+    }
+
+    /* 深色模式文字層次 */
+    [data-theme="dark"] .text-slate-900,
+    [data-theme="dark"] .text-slate-800 {
+      color: var(--text-primary) !important;
+    }
+
+    [data-theme="dark"] .text-slate-700 {
+      color: var(--text-secondary) !important;
+    }
+
+    [data-theme="dark"] .text-slate-600 {
+      color: #CBD5E1 !important;
+    }
+
+    [data-theme="dark"] .text-slate-500 {
+      color: var(--text-muted) !important;
+    }
+
+    [data-theme="dark"] .text-slate-400 {
+      color: var(--text-faint) !important;
+    }
+
+    /* 深色模式主要按鈕與選中膠囊反轉高對比 */
+    [data-theme="dark"] .bg-slate-900.text-white {
+      background-color: #F1F5F9 !important;
+      color: #0F172A !important;
+      border-color: #F1F5F9 !important;
+    }
+
+    [data-theme="dark"] .bg-slate-900.text-white:hover {
+      background-color: #E2E8F0 !important;
+    }
+
+    /* 深色模式懸停狀態 */
+    [data-theme="dark"] .hover\:bg-slate-50:hover,
+    [data-theme="dark"] .hover\:bg-slate-100:hover,
+    [data-theme="dark"] .hover\:bg-slate-200\/70:hover {
+      background-color: #273549 !important;
+    }
+
+    [data-theme="dark"] .hover\:text-slate-900:hover,
+    [data-theme="dark"] .hover\:text-slate-950:hover,
+    [data-theme="dark"] .hover\:text-slate-800:hover {
+      color: #F8FAFC !important;
+    }
+
+    [data-theme="dark"] .hover\:border-slate-300:hover {
+      border-color: #475569 !important;
+    }
+
+    /* 深色模式表單控制項 */
+    [data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
+    [data-theme="dark"] select,
+    [data-theme="dark"] textarea {
+      background-color: var(--bg-input) !important;
+      color: var(--text-primary) !important;
+      border-color: var(--border-color) !important;
+    }
+
+    [data-theme="dark"] input::placeholder,
+    [data-theme="dark"] textarea::placeholder {
+      color: #64748B !important;
+    }
+
+    [data-theme="dark"] input:focus,
+    [data-theme="dark"] select:focus,
+    [data-theme="dark"] textarea:focus {
+      border-color: #94A3B8 !important;
+    }
+
+    [data-theme="dark"] button:disabled.bg-slate-100 {
+      background-color: rgba(15, 23, 42, 0.7) !important;
+      color: #64748B !important;
+      border: 1px solid #334155 !important;
+    }
+
+    /* 深色模式狀態標籤與男女宿徽章高亮度半透明調校 */
+    [data-theme="dark"] .bg-emerald-50 {
+      background-color: rgba(16, 185, 129, 0.16) !important;
+    }
+    [data-theme="dark"] .text-emerald-700 {
+      color: #6EE7B7 !important;
+    }
+    [data-theme="dark"] .border-emerald-200\/80 {
+      border-color: rgba(16, 185, 129, 0.35) !important;
+    }
+
+    [data-theme="dark"] .bg-amber-50,
+    [data-theme="dark"] .bg-amber-50\/70,
+    [data-theme="dark"] .bg-amber-100 {
+      background-color: rgba(245, 158, 11, 0.16) !important;
+    }
+    [data-theme="dark"] .text-amber-700,
+    [data-theme="dark"] .text-amber-800,
+    [data-theme="dark"] .text-amber-900 {
+      color: #FCD34D !important;
+    }
+    [data-theme="dark"] .border-amber-200\/80 {
+      border-color: rgba(245, 158, 11, 0.35) !important;
+    }
+
+    [data-theme="dark"] .bg-sky-50,
+    [data-theme="dark"] .bg-sky-50\/80,
+    [data-theme="dark"] .bg-sky-50\/50 {
+      background-color: rgba(14, 165, 233, 0.16) !important;
+    }
+    [data-theme="dark"] .text-sky-700,
+    [data-theme="dark"] .text-sky-800 {
+      color: #7DD3FC !important;
+    }
+    [data-theme="dark"] .border-sky-200\/80 {
+      border-color: rgba(14, 165, 233, 0.35) !important;
+    }
+
+    [data-theme="dark"] .bg-rose-50,
+    [data-theme="dark"] .bg-rose-50\/80,
+    [data-theme="dark"] .bg-rose-50\/50,
+    [data-theme="dark"] .hover\:bg-rose-50\/40:hover {
+      background-color: rgba(244, 63, 94, 0.16) !important;
+    }
+    [data-theme="dark"] .text-rose-600,
+    [data-theme="dark"] .text-rose-700,
+    [data-theme="dark"] .text-rose-800 {
+      color: #FDA4AF !important;
+    }
+    [data-theme="dark"] .border-rose-200,
+    [data-theme="dark"] .border-rose-200\/80 {
+      border-color: rgba(244, 63, 94, 0.35) !important;
+    }
+
+    [data-theme="dark"] .bg-indigo-50 {
+      background-color: rgba(139, 92, 246, 0.18) !important;
+    }
+    [data-theme="dark"] .text-indigo-700 {
+      color: #C4B5FD !important;
+    }
+    [data-theme="dark"] .border-indigo-200\/80 {
+      border-color: rgba(139, 92, 246, 0.38) !important;
+    }
+  </style>
+</head>
+<body class="font-sans antialiased min-h-screen">
+
+  <!-- ==================== 1. 初始身分與登入入口畫面 ==================== -->
+  <section id="welcomeScreen" class="relative min-h-screen flex items-center justify-center px-4 py-14">
+    <!-- 初始畫面右上角淺色／深色模式切換器 -->
+    <div class="fixed top-4 right-4 z-40">
+      <div class="inline-flex bg-slate-100 p-1 rounded-xl border border-[#E2E8F0] shadow-2xs" role="group" aria-label="主題模式切換">
+        <button
+          type="button"
+          data-theme-choice="light"
+          class="theme-choice-btn px-2.5 py-1 rounded-lg text-xs font-semibold transition-all"
+        >☀️ 淺色</button>
+        <button
+          type="button"
+          data-theme-choice="dark"
+          class="theme-choice-btn px-2.5 py-1 rounded-lg text-xs font-medium transition-all"
+        >🌙 深色</button>
+      </div>
+    </div>
+
+    <div class="w-full max-w-md bg-white rounded-3xl border border-[#E2E8F0] shadow-xs p-6 sm:p-8 space-y-6 animate-modal-in">
+      <!-- 品牌識別標題 -->
+      <div class="text-center space-y-1.5">
+        <div class="inline-flex items-center justify-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+          <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">宿速排 DormQueue</h1>
+        </div>
+        <p class="text-xs sm:text-sm text-slate-500">宿舍淋浴與洗衣即時預約排隊系統</p>
+      </div>
+
+      <!-- 分頁切換：住宿生登入 / 管理員登入 -->
+      <div class="grid grid-cols-2 bg-slate-100 p-1 rounded-2xl border border-slate-200/70" role="tablist">
+        <button
+          type="button"
+          id="welcomeTabStudent"
+          class="py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold bg-white text-slate-900 shadow-2xs transition-all"
+        >🎓 住宿生登入</button>
+        <button
+          type="button"
+          id="welcomeTabAdmin"
+          class="py-2 px-3 rounded-xl text-xs sm:text-sm font-medium text-slate-500 hover:text-slate-800 transition-all"
+        >🛠️ 管理員登入</button>
+      </div>
+
+      <!-- (A) 住宿生登入表單 -->
+      <div id="welcomeStudentPanel" class="space-y-4">
+        <form id="welcomeStudentForm" class="space-y-4" novalidate>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label for="setupNameInput" class="block text-xs font-semibold text-slate-700 mb-1.5">
+                姓名 <span class="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="setupNameInput"
+                maxlength="15"
+                placeholder="例如：王小明"
+                class="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] text-sm text-slate-900 focus:outline-none focus:border-slate-900 transition-colors"
+              />
+            </div>
+            <div>
+              <label for="setupRoomInput" class="block text-xs font-semibold text-slate-700 mb-1.5">
+                房號 <span class="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="setupRoomInput"
+                maxlength="10"
+                placeholder="例如：302"
+                class="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] text-sm text-slate-900 focus:outline-none focus:border-slate-900 transition-colors"
+              />
+            </div>
+          </div>
+
+          <!-- 性別選擇大按鈕卡片 -->
+          <div class="space-y-1.5">
+            <span class="block text-xs font-semibold text-slate-700">
+              性別（系統將自動配對男宿／女宿） <span class="text-rose-500">*</span>
+            </span>
+            <div class="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                data-setup-gender="male"
+                class="setup-gender-card p-3.5 rounded-2xl border border-[#E2E8F0] bg-white hover:bg-slate-50 text-left transition-all flex flex-col gap-1"
+              >
+                <span class="text-lg">👨</span>
+                <span class="text-xs sm:text-sm font-bold text-slate-900">男性</span>
+                <span class="text-[11px] text-slate-500">自動配對男宿</span>
+              </button>
+
+              <button
+                type="button"
+                data-setup-gender="female"
+                class="setup-gender-card p-3.5 rounded-2xl border border-[#E2E8F0] bg-white hover:bg-slate-50 text-left transition-all flex flex-col gap-1"
+              >
+                <span class="text-lg">👩</span>
+                <span class="text-xs sm:text-sm font-bold text-slate-900">女性</span>
+                <span class="text-[11px] text-slate-500">自動配對女宿</span>
+              </button>
+            </div>
+          </div>
+
+          <p id="setupStudentError" class="hidden text-xs font-medium text-rose-600"></p>
+
+          <button
+            type="submit"
+            class="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-[0.99] text-white text-sm font-semibold transition-all"
+          >進入預約系統 →</button>
+        </form>
+
+        <!-- 課堂展示快捷帶入按鈕 -->
+        <div class="pt-3 border-t border-slate-100 space-y-2">
+          <p class="text-[11px] font-medium text-slate-400 text-center">課堂展示快捷帶入（一鍵填入並進入）</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button
+              type="button"
+              id="quickMaleDemoBtn"
+              class="py-2 px-3 rounded-xl bg-sky-50/80 hover:bg-sky-100/80 text-sky-800 border border-sky-200/80 text-xs font-medium transition-colors"
+            >👨 男生範例（302房 王小明）</button>
+            <button
+              type="button"
+              id="quickFemaleDemoBtn"
+              class="py-2 px-3 rounded-xl bg-rose-50/80 hover:bg-rose-100/80 text-rose-800 border border-rose-200/80 text-xs font-medium transition-colors"
+            >👩 女生範例（205房 林雅婷）</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- (B) 管理員登入表單 -->
+      <div id="welcomeAdminPanel" class="hidden space-y-4">
+        <form id="welcomeAdminForm" class="space-y-4" novalidate>
+          <div>
+            <label for="setupAdminUserInput" class="block text-xs font-semibold text-slate-700 mb-1.5">管理員帳號</label>
+            <input
+              type="text"
+              id="setupAdminUserInput"
+              autocomplete="username"
+              placeholder="請輸入管理員帳號（預設：admin）"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] text-sm text-slate-900 focus:outline-none focus:border-slate-900 transition-colors"
+            />
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label for="setupAdminPassInput" class="block text-xs font-semibold text-slate-700">管理員密碼</label>
+              <button
+                type="button"
+                id="toggleLoginPassBtn"
+                class="text-[11px] font-medium text-slate-400 hover:text-slate-700 transition-colors"
+              >👁️ 顯示密碼</button>
+            </div>
+            <input
+              type="password"
+              id="setupAdminPassInput"
+              autocomplete="current-password"
+              placeholder="請輸入管理員密碼（預設：admin123）"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] text-sm text-slate-900 focus:outline-none focus:border-slate-900 transition-colors"
+            />
+          </div>
+
+          <p id="setupAdminError" class="hidden text-xs font-medium text-rose-600"></p>
+
+          <button
+            type="submit"
+            class="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-[0.99] text-white text-sm font-semibold transition-all"
+          >登入管理員後台 →</button>
+        </form>
+
+        <div class="pt-3 border-t border-slate-100 space-y-2">
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              id="welcomeFillAdminDemoBtn"
+              class="flex-1 py-2.5 px-3 rounded-xl bg-amber-50 hover:bg-amber-100/80 text-amber-800 border border-amber-200/80 text-xs font-semibold transition-colors"
+            >⚡ 帶入目前管理員帳密</button>
+            <button
+              type="button"
+              id="welcomeResetDefaultAdminBtn"
+              class="py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/80 text-xs font-medium transition-colors shrink-0"
+              title="若忘記自訂密碼可恢復為預設 admin / admin123"
+            >恢復預設帳密</button>
+          </div>
+          <p id="currentAdminHintText" class="text-[11px] text-slate-400 text-center">目前儲存帳號：admin</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 2. 主應用程式容器 ==================== -->
+  <div id="appShell" class="hidden">
+
+    <!-- ==================== 頂部極簡導覽列 ==================== -->
+    <header class="sticky top-0 z-30 bg-white/95 backdrop-blur-xs border-b border-[#E2E8F0]">
+      <!-- 第一列：品牌名稱 + 目前身分 + 切換身分 -->
+      <div class="max-w-5xl mx-auto px-4 sm:px-6 py-3 sm:py-0 sm:h-16 flex flex-wrap items-center justify-between gap-2.5">
+        <div class="flex items-center gap-2.5 shrink-0">
+          <span id="brandDot" class="w-2.5 h-2.5 rounded-full bg-emerald-500 transition-colors"></span>
+          <h1 class="text-base sm:text-lg font-bold tracking-tight text-slate-900">宿速排 DormQueue</h1>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2 sm:gap-2.5">
+          <!-- 學生身分膠囊 -->
+          <div
+            id="studentIdentityPill"
+            class="inline-flex items-center gap-2 bg-slate-50 border border-[#E2E8F0] rounded-xl px-3 py-1.5 text-xs sm:text-sm"
+          >
+            <span id="studentIdentityText" class="font-medium text-slate-700">👨 男性 · 302房 王小明</span>
+          </div>
+
+          <!-- 管理員身分膠囊 -->
+          <div
+            id="adminIdentityPill"
+            class="hidden items-center gap-2 bg-amber-50/70 border border-amber-200/80 rounded-xl px-3 py-1.5 text-xs sm:text-sm"
+          >
+            <span id="adminIdentityText" class="font-semibold text-amber-900">🛠️ 管理員 (admin)</span>
+          </div>
+
+          <!-- 主畫面頂部導覽列淺色／深色模式切換器 -->
+          <div class="inline-flex bg-slate-100 p-0.5 rounded-xl border border-[#E2E8F0]" role="group" aria-label="主題模式切換">
+            <button
+              type="button"
+              data-theme-choice="light"
+              class="theme-choice-btn px-2.5 py-1 rounded-lg text-xs font-semibold transition-all"
+            >☀️ 淺色</button>
+            <button
+              type="button"
+              data-theme-choice="dark"
+              class="theme-choice-btn px-2.5 py-1 rounded-lg text-xs font-medium transition-all"
+            >🌙 深色</button>
+          </div>
+
+          <!-- 返回入口切換身分按鈕 -->
+          <button
+            type="button"
+            id="switchIdentityBtn"
+            class="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-[#E2E8F0] text-xs font-semibold text-slate-700 hover:text-slate-950 shadow-2xs transition-colors"
+          >切換身分</button>
+        </div>
+      </div>
+
+      <!-- 第二列：視圖分頁切換 + 管理員專屬設定按鈕 -->
+      <div class="border-t border-slate-100 bg-white">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2.5">
+          <!-- 學生視角雙主分頁 -->
+          <div id="studentMainTabs" class="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200/70 gap-1" role="tablist">
+            <button
+              type="button"
+              data-student-tab="board"
+              class="student-tab-btn px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-900 shadow-2xs transition-all"
+            >🏠 設備預約看板</button>
+            <button
+              type="button"
+              data-student-tab="repairs"
+              class="student-tab-btn px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition-all inline-flex items-center gap-1.5"
+            >
+              <span>🔧 設備報修系統</span>
+              <span id="studentRepairBadge" class="hidden px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">0</span>
+            </button>
+          </div>
+
+          <!-- 管理員視角雙主分頁 -->
+          <div id="adminMainTabs" class="hidden bg-slate-100 p-1 rounded-xl border border-slate-200/70 gap-1" role="tablist">
+            <button
+              type="button"
+              data-admin-tab="monitor"
+              class="admin-tab-btn px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-900 shadow-2xs transition-all"
+            >🏠 全館設備監控</button>
+            <button
+              type="button"
+              data-admin-tab="reviews"
+              class="admin-tab-btn px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition-all inline-flex items-center gap-1.5"
+            >
+              <span>📋 報修審核判定</span>
+              <span id="adminPendingBadge" class="hidden px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white">0</span>
+            </button>
+          </div>
+
+          <!-- 管理員右側功能按鈕：棟別與樓層設定 + 帳密設定 -->
+          <div id="adminConfigActions" class="hidden flex-wrap items-center gap-2">
+            <button
+              type="button"
+              id="openBuildingConfigBtn"
+              class="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-[#E2E8F0] text-xs font-semibold text-slate-800 shadow-2xs transition-colors inline-flex items-center gap-1.5"
+            >
+              <span>🏢</span>
+              <span>棟別與樓層設定</span>
+            </button>
+            <button
+              type="button"
+              id="openAdminAuthModalBtn"
+              class="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-[#E2E8F0] text-xs font-semibold text-slate-800 shadow-2xs transition-colors inline-flex items-center gap-1.5"
+            >
+              <span>🔐</span>
+              <span>帳密設定</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 第三列：棟別與樓層篩選列（僅在設備看板／設備監控分頁顯示） -->
+      <div id="locationFilterBar" class="border-t border-slate-100 bg-slate-50/70">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
+          <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+            <!-- 性別分流標示 -->
+            <span
+              id="genderFilterBadge"
+              class="px-2.5 py-1 rounded-lg text-[11px] font-semibold border shrink-0"
+            >👨 依性別顯示：男宿</span>
+
+            <!-- 棟別分頁膠囊 -->
+            <div class="flex items-center gap-1.5">
+              <span class="text-[11px] font-medium text-slate-400 shrink-0">棟別</span>
+              <div id="buildingTabs" class="inline-flex flex-wrap bg-slate-200/70 p-0.5 rounded-xl gap-0.5" role="tablist" aria-label="棟別切換"></div>
+            </div>
+
+            <span class="hidden sm:inline-block h-4 w-px bg-slate-200"></span>
+
+            <!-- 樓層膠囊 -->
+            <div class="flex items-center gap-1.5">
+              <span class="text-[11px] font-medium text-slate-400 shrink-0">樓層</span>
+              <div id="floorPills" class="inline-flex flex-wrap gap-1" role="tablist" aria-label="樓層切換"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ==================== 學生模式：情境式個人狀態列 ==================== -->
+    <div id="myStatusBar" class="hidden border-b border-[#E2E8F0] bg-white">
+      <div id="myStatusContent" class="max-w-5xl mx-auto px-4 sm:px-6 py-3 space-y-2"></div>
+    </div>
+
+    <!-- ==================== 管理員模式：當層極簡四項總覽列 ==================== -->
+    <div id="adminSummaryBar" class="hidden border-b border-[#E2E8F0] bg-white">
+      <div id="adminSummaryContent" class="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm"></div>
+    </div>
+
+    <!-- ==================== 主要內容區 ==================== -->
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10 pb-28 space-y-10">
+
+      <!-- 視圖 A：設備預約看板（學生看板 & 管理員全館設備監控共用） -->
+      <div id="facilityBoardView" class="space-y-10">
+        <!-- 區塊一：🚿 淋浴間（每次 15 分鐘） -->
+        <section aria-labelledby="showerSectionHeading" class="space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center gap-2.5">
+              <h2 id="showerSectionHeading" class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <span>🚿</span>
+                <span>淋浴間</span>
+              </h2>
+              <span class="text-xs text-slate-400 font-medium">每次 15 分鐘</span>
+              <span
+                id="showerAvailPill"
+                class="px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/80"
+              >空閒 0 / 0</span>
+            </div>
+
+            <div id="showerHeaderActions" class="flex flex-wrap items-center gap-2"></div>
+          </div>
+
+          <div id="showerGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+        </section>
+
+        <hr class="border-[#E2E8F0]" />
+
+        <!-- 區塊二：🧺 洗衣機（每次 40 分鐘） -->
+        <section aria-labelledby="washerSectionHeading" class="space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center gap-2.5">
+              <h2 id="washerSectionHeading" class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <span>🧺</span>
+                <span>洗衣機</span>
+              </h2>
+              <span class="text-xs text-slate-400 font-medium">每次 40 分鐘</span>
+              <span
+                id="washerAvailPill"
+                class="px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/80"
+              >空閒 0 / 0</span>
+            </div>
+
+            <div id="washerHeaderActions" class="flex flex-wrap items-center gap-2"></div>
+          </div>
+
+          <div id="washerGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        </section>
+      </div>
+
+      <!-- 視圖 B：學生專屬「🔧 設備報修系統」 -->
+      <section id="studentRepairView" class="hidden space-y-6" aria-labelledby="studentRepairHeading">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 id="studentRepairHeading" class="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2">
+              <span>🔧</span>
+              <span>設備報修與進度追蹤</span>
+            </h2>
+            <p class="text-xs text-slate-500 mt-1">
+              提交報修單後將由宿舍管理員進行審核判定；判定故障前設備仍維持原有運作狀態，避免誤報影響其他住宿生使用。
+            </p>
+          </div>
+          <button
+            type="button"
+            id="openNewTicketBtn"
+            class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-[0.99] text-white text-xs sm:text-sm font-semibold shadow-2xs transition-all"
+          >＋ 填寫新報修單</button>
+        </div>
+
+        <!-- 學生報修狀態篩選膠囊 -->
+        <div id="studentTicketFilters" class="flex flex-wrap items-center gap-1.5"></div>
+
+        <!-- 學生報修單卡片列表 -->
+        <div id="studentTicketList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+      </section>
+
+      <!-- 視圖 C：管理員專屬「📋 報修審核判定」 -->
+      <section id="adminReviewView" class="hidden space-y-6" aria-labelledby="adminReviewHeading">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 id="adminReviewHeading" class="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2">
+              <span>📋</span>
+              <span>報修審核與故障判定中心</span>
+            </h2>
+            <p class="text-xs text-slate-500 mt-1">
+              審核全館男宿與女宿住宿生提交的報修案件，判定故障後將自動停機並取消該設備保留，修復完成後可一鍵重新上線。
+            </p>
+          </div>
+        </div>
+
+        <!-- 管理員審核狀態篩選膠囊 -->
+        <div id="adminTicketFilters" class="flex flex-wrap items-center gap-1.5"></div>
+
+        <!-- 管理員報修審核卡片列表 -->
+        <div id="adminTicketList" class="space-y-4"></div>
+      </section>
+
+      <!-- 底部區塊（僅管理員模式顯示）：📋 系統與報修日誌 -->
+      <section id="adminLogsSection" aria-labelledby="logsSectionHeading" class="hidden pt-2 space-y-4">
+        <hr class="border-[#E2E8F0]" />
+        <div class="flex items-center justify-between pt-4">
+          <button
+            type="button"
+            id="toggleLogsBtn"
+            class="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2 hover:text-slate-700 transition-colors"
+          >
+            <span>📋</span>
+            <span>系統與報修日誌</span>
+            <span id="logsCountBadge" class="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">0</span>
+            <span id="logsChevron" class="text-xs text-slate-400 ml-1">收合</span>
+          </button>
+          <button
+            type="button"
+            id="clearLogsBtn"
+            class="text-xs text-slate-400 hover:text-slate-600 transition-colors px-2 py-1 rounded-lg hover:bg-slate-100"
+          >清空紀錄</button>
+        </div>
+        <div id="adminLogsBody" class="bg-white rounded-2xl border border-[#E2E8F0] divide-y divide-slate-100"></div>
+      </section>
+
+    </main>
+
+    <!-- ==================== 課堂展示懸浮膠囊控制鈕（預設收合） ==================== -->
+    <div class="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-2">
+      <div
+        id="demoPopover"
+        class="hidden w-72 bg-white rounded-2xl border border-[#E2E8F0] shadow-lg p-3 space-y-1.5"
+      >
+        <p class="text-[11px] font-medium text-slate-400 px-2 py-0.5">課堂展示時間推進與情境模擬</p>
+        <button
+          type="button"
+          id="demoPlus5Btn"
+          class="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-slate-700 hover:bg-slate-100 transition-colors flex items-center justify-between"
+        >
+          <span>⏭️ 時間快轉 +5 分鐘</span>
+          <span class="font-mono text-[11px] text-slate-400">+05:00</span>
+        </button>
+        <button
+          type="button"
+          id="demoPlus15Btn"
+          class="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-slate-700 hover:bg-slate-100 transition-colors flex items-center justify-between"
+        >
+          <span>⏭️ 時間快轉 +15 分鐘</span>
+          <span class="font-mono text-[11px] text-slate-400">+15:00</span>
+        </button>
+        <button
+          type="button"
+          id="demoPlus40Btn"
+          class="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-slate-700 hover:bg-slate-100 transition-colors flex items-center justify-between"
+        >
+          <span>⏭️ 時間快轉 +40 分鐘</span>
+          <span class="font-mono text-[11px] text-slate-400">+40:00</span>
+        </button>
+        <button
+          type="button"
+          id="demoCompleteOneBtn"
+          class="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-sky-700 hover:bg-sky-50 transition-colors"
+        >
+          ⚡ 模擬當前設備使用完畢
+        </button>
+        <div class="border-t border-slate-100 pt-1">
+          <button
+            type="button"
+            id="demoResetBtn"
+            class="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors"
+          >
+            🔄 重置預設模擬資料
+          </button>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        id="demoToggleBtn"
+        aria-expanded="false"
+        class="px-4 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-md transition-all flex items-center gap-1.5"
+      >
+        <span>⚡</span>
+        <span>展示控制</span>
+      </button>
+    </div>
+
+  </div>
+
+  <!-- ==================== 模擬 LINE 推播通知 Toast 容器 ==================== -->
+  <div id="toastContainer" class="fixed top-20 right-4 z-50 flex flex-col gap-2 w-[calc(100vw-2rem)] sm:w-80 pointer-events-none"></div>
+
+  <!-- ==================== 彈窗 1：學生填寫新報修單 ==================== -->
+  <div id="newTicketModal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-[1px] flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-[#E2E8F0] shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col animate-modal-in">
+      <div class="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between shrink-0">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">🔧 填寫設備報修單</h3>
+          <p class="text-xs text-slate-500 mt-0.5">送出後將交由管理員審核判定，並可於「設備報修系統」追蹤處理進度。</p>
+        </div>
+        <button type="button" data-close-modal="newTicketModal" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">✕</button>
+      </div>
+
+      <form id="newTicketForm" class="p-6 overflow-y-auto space-y-4" novalidate>
+        <!-- 棟別、樓層、設備三聯下拉選單 -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label for="ticketBuildingSelect" class="block text-xs font-semibold text-slate-700 mb-1">棟別</label>
+            <select
+              id="ticketBuildingSelect"
+              class="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-slate-900"
+            ></select>
+          </div>
+          <div>
+            <label for="ticketFloorSelect" class="block text-xs font-semibold text-slate-700 mb-1">樓層</label>
+            <select
+              id="ticketFloorSelect"
+              class="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-slate-900"
+            ></select>
+          </div>
+          <div>
+            <label for="ticketUnitSelect" class="block text-xs font-semibold text-slate-700 mb-1">故障設備</label>
+            <select
+              id="ticketUnitSelect"
+              class="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-white text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-slate-900"
+            ></select>
+          </div>
+        </div>
+
+        <!-- 故障類型 -->
+        <div>
+          <label for="ticketFaultTypeSelect" class="block text-xs font-semibold text-slate-700 mb-1">故障類型</label>
+          <select
+            id="ticketFaultTypeSelect"
+            class="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-white text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-slate-900"
+          >
+            <option value="無熱水／水溫異常">無熱水／水溫異常</option>
+            <option value="排水孔堵塞／積水">排水孔堵塞／積水</option>
+            <option value="門鎖／蓮蓬頭損壞">門鎖／蓮蓬頭損壞</option>
+            <option value="無法啟動／不脫水">無法啟動／不脫水</option>
+            <option value="漏水／異常噪音">漏水／異常噪音</option>
+            <option value="其他故障">其他故障</option>
+          </select>
+        </div>
+
+        <!-- 緊急程度 -->
+        <div class="space-y-1.5">
+          <span class="block text-xs font-semibold text-slate-700">緊急程度</span>
+          <div class="grid grid-cols-2 gap-2.5">
+            <label class="flex items-center gap-2 p-2.5 rounded-xl border border-[#E2E8F0] hover:bg-slate-50 cursor-pointer text-xs font-semibold text-slate-800">
+              <input type="radio" name="ticketUrgency" value="normal" checked class="accent-slate-900" />
+              <span>一般報修</span>
+            </label>
+            <label class="flex items-center gap-2 p-2.5 rounded-xl border border-[#E2E8F0] hover:bg-rose-50/40 cursor-pointer text-xs font-semibold text-rose-700">
+              <input type="radio" name="ticketUrgency" value="urgent" class="accent-rose-600" />
+              <span>🚨 緊急影響使用</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 詳細問題描述 -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <label for="ticketDescriptionInput" class="block text-xs font-semibold text-slate-700">
+              詳細問題描述 <span class="text-rose-500">*</span>
+            </label>
+            <button
+              type="button"
+              id="fillSampleTicketBtn"
+              class="text-[11px] font-semibold text-sky-700 hover:text-sky-900 px-2 py-0.5 rounded-md bg-sky-50 hover:bg-sky-100 transition-colors"
+            >✨ 快速範例填入</button>
+          </div>
+          <textarea
+            id="ticketDescriptionInput"
+            rows="3"
+            maxlength="200"
+            placeholder="請簡述設備異常現象（例如：開啟熱水等待約 3 分鐘仍全為冷水，且水壓偏弱）"
+            class="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-slate-900"
+          ></textarea>
+        </div>
+
+        <p id="newTicketError" class="hidden text-xs font-medium text-rose-600"></p>
+
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+          <button
+            type="button"
+            data-close-modal="newTicketModal"
+            class="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+          >取消</button>
+          <button
+            type="submit"
+            class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors"
+          >送出報修單</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== 彈窗 2：管理員帳號密碼自訂設定 ==================== -->
+  <div id="adminAuthModal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-[1px] flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-[#E2E8F0] shadow-xl w-full max-w-md p-6 space-y-4 animate-modal-in">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">🔐 管理員帳號密碼設定</h3>
+          <p class="text-xs text-slate-500 mt-0.5">驗證目前密碼後即可自訂新的登入帳號與密碼，設定將即時儲存。</p>
+        </div>
+        <button type="button" data-close-modal="adminAuthModal" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">✕</button>
+      </div>
+
+      <form id="adminAuthForm" class="space-y-3.5" novalidate>
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label for="authCurrentPassInput" class="block text-xs font-semibold text-slate-700">目前密碼 <span class="text-rose-500">*</span></label>
+            <button
+              type="button"
+              id="toggleAuthModalPassBtn"
+              class="text-[11px] font-medium text-slate-400 hover:text-slate-700 transition-colors"
+            >👁️ 顯示密碼</button>
+          </div>
+          <input
+            type="password"
+            id="authCurrentPassInput"
+            placeholder="請輸入目前使用中的管理員密碼"
+            class="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:border-slate-900"
+          />
+        </div>
+
+        <hr class="border-slate-100" />
+
+        <div>
+          <label for="authNewUserInput" class="block text-xs font-semibold text-slate-700 mb-1">新管理員帳號 <span class="text-rose-500">*</span></label>
+          <input
+            type="text"
+            id="authNewUserInput"
+            maxlength="24"
+            placeholder="請輸入新帳號（至少 3 個字元）"
+            class="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:border-slate-900"
+          />
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label for="authNewPassInput" class="block text-xs font-semibold text-slate-700 mb-1">新密碼 <span class="text-rose-500">*</span></label>
+            <input
+              type="password"
+              id="authNewPassInput"
+              maxlength="32"
+              placeholder="至少 4 個字元"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:border-slate-900"
+            />
+          </div>
+          <div>
+            <label for="authConfirmPassInput" class="block text-xs font-semibold text-slate-700 mb-1">確認新密碼 <span class="text-rose-500">*</span></label>
+            <input
+              type="password"
+              id="authConfirmPassInput"
+              maxlength="32"
+              placeholder="再次輸入新密碼"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:border-slate-900"
+            />
+          </div>
+        </div>
+
+        <p id="adminAuthError" class="hidden text-xs font-medium text-rose-600"></p>
+
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+          <button
+            type="button"
+            data-close-modal="adminAuthModal"
+            class="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+          >取消</button>
+          <button
+            type="submit"
+            class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors"
+          >儲存新帳密</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== 彈窗 3：管理員手動設為維修中 ==================== -->
+  <div id="faultModal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-[1px] flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-[#E2E8F0] shadow-xl w-full max-w-sm p-6 space-y-4 animate-modal-in">
+      <div class="flex items-center justify-between">
+        <h3 id="faultModalTitle" class="text-base font-bold text-slate-900">設為維修中</h3>
+        <button type="button" data-close-modal="faultModal" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">✕</button>
+      </div>
+      <p id="faultModalSubtitle" class="text-xs text-slate-500">請選擇停機檢修原因，設備將暫停開放學生預約。</p>
+
+      <div id="faultReasonOptions" class="grid grid-cols-1 gap-2"></div>
+
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button
+          type="button"
+          data-close-modal="faultModal"
+          class="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+        >取消</button>
+        <button
+          type="button"
+          id="confirmFaultBtn"
+          class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition-colors"
+        >確認設為維修中</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 彈窗 4：管理員檢視與管理候補名單 ==================== -->
+  <div id="waitlistModal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-[1px] flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-[#E2E8F0] shadow-xl w-full max-w-md p-6 space-y-4 animate-modal-in">
+      <div class="flex items-center justify-between">
+        <h3 id="waitlistModalTitle" class="text-base font-bold text-slate-900">候補排隊名單</h3>
+        <button type="button" data-close-modal="waitlistModal" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">✕</button>
+      </div>
+      <div id="waitlistModalBody" class="space-y-2 max-h-72 overflow-y-auto"></div>
+      <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+        <button
+          type="button"
+          id="clearCategoryWaitlistBtn"
+          class="text-xs font-medium text-rose-600 hover:text-rose-700 px-2.5 py-1.5 rounded-lg hover:bg-rose-50 transition-colors"
+        >清空此類候補名單</button>
+        <button
+          type="button"
+          data-close-modal="waitlistModal"
+          class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition-colors"
+        >完成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 彈窗 5：管理員新增設備 ==================== -->
+  <div id="addUnitModal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-[1px] flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-[#E2E8F0] shadow-xl w-full max-w-sm p-6 space-y-4 animate-modal-in">
+      <div class="flex items-center justify-between">
+        <h3 id="addUnitModalTitle" class="text-base font-bold text-slate-900">新增宿舍設備</h3>
+        <button type="button" data-close-modal="addUnitModal" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">✕</button>
+      </div>
+      <form id="addUnitForm" class="space-y-3">
+        <div>
+          <label for="newUnitNameInput" class="block text-xs font-medium text-slate-600 mb-1.5">設備名稱</label>
+          <input
+            type="text"
+            id="newUnitNameInput"
+            maxlength="20"
+            required
+            placeholder="例如：3F-淋浴間05"
+            class="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:border-slate-900 transition-colors"
+          />
+        </div>
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button
+            type="button"
+            data-close-modal="addUnitModal"
+            class="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+          >取消</button>
+          <button
+            type="submit"
+            class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors"
+          >確認新增</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== 彈窗 6：管理員棟別、性別歸屬與樓層設定 ==================== -->
+  <div id="buildingModal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-[1px] flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-[#E2E8F0] shadow-xl w-full max-w-2xl max-h-[88vh] flex flex-col animate-modal-in">
+      <div class="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between shrink-0">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">🏢 棟別與樓層設定</h3>
+          <p class="text-xs text-slate-500 mt-0.5">新增或編輯宿舍棟別、設定男宿／女宿性別歸屬、調整樓層順序並自動生成預設設備。</p>
+        </div>
+        <button type="button" data-close-modal="buildingModal" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">✕</button>
+      </div>
+
+      <div class="p-6 overflow-y-auto space-y-6">
+        <!-- 區塊 A：新增棟別 -->
+        <div class="bg-slate-50 rounded-2xl border border-[#E2E8F0] p-4 space-y-3">
+          <h4 class="text-xs font-bold text-slate-800 tracking-wide">➕ 新增宿舍棟別</h4>
+          <form id="addBuildingForm" class="space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label for="newBuildingNameInput" class="block text-[11px] font-medium text-slate-500 mb-1">棟別名稱</label>
+                <input
+                  type="text"
+                  id="newBuildingNameInput"
+                  maxlength="20"
+                  required
+                  placeholder="例如：男宿C棟、女宿D棟"
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-[#E2E8F0] text-xs sm:text-sm focus:outline-none focus:border-slate-900"
+                />
+              </div>
+              <div>
+                <label for="newBuildingFloorsInput" class="block text-[11px] font-medium text-slate-500 mb-1">初始樓層（以逗號分隔）</label>
+                <input
+                  type="text"
+                  id="newBuildingFloorsInput"
+                  maxlength="60"
+                  required
+                  value="2F, 3F, 4F"
+                  placeholder="例如：2F, 3F, 4F"
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-[#E2E8F0] text-xs sm:text-sm focus:outline-none focus:border-slate-900"
+                />
+              </div>
+            </div>
+
+            <div class="space-y-1">
+              <span class="block text-[11px] font-medium text-slate-500">宿舍性別歸屬</span>
+              <div class="grid grid-cols-2 gap-2.5">
+                <label class="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-[#E2E8F0] hover:border-slate-300 cursor-pointer text-xs font-semibold text-slate-800">
+                  <input type="radio" name="newBuildingGender" value="male" checked class="accent-slate-900" />
+                  <span>👨 男宿（限男性）</span>
+                </label>
+                <label class="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-[#E2E8F0] hover:border-slate-300 cursor-pointer text-xs font-semibold text-slate-800">
+                  <input type="radio" name="newBuildingGender" value="female" class="accent-slate-900" />
+                  <span>👩 女宿（限女性）</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+              <label class="inline-flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none">
+                <input type="checkbox" id="newBuildingAutoUnits" checked class="rounded accent-slate-900" />
+                <span>自動為各樓層建立預設淋浴間與洗衣機各 2 台</span>
+              </label>
+              <button
+                type="submit"
+                class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors"
+              >新增棟別</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- 區塊 B：現有棟別編輯與樓層管理 -->
+        <div class="space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h4 class="text-xs font-bold text-slate-800 tracking-wide">🗂️ 管理現有棟別與樓層</h4>
+            <div id="modalBuildingSelector" class="inline-flex flex-wrap bg-slate-100 p-1 rounded-xl gap-1"></div>
+          </div>
+
+          <div id="modalBuildingDetail" class="space-y-4"></div>
+        </div>
+      </div>
+
+      <div class="px-6 py-3.5 border-t border-[#E2E8F0] bg-slate-50/60 flex justify-end shrink-0">
+        <button
+          type="button"
+          data-close-modal="buildingModal"
+          class="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors"
+        >完成設定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 應用程式核心邏輯 ==================== -->
+  <script>
+    (function () {
+      'use strict';
+
+      const STORAGE_KEY = 'dormqueue_v4_tickets';
+      const THEME_STORAGE_KEY = 'dormqueue_theme';
+      const DEFAULT_ADMIN_CREDS = { username: 'admin', password: 'admin123' };
+      const HOLD_SECONDS = 5 * 60; // 預約保留 5 分鐘
+
+      // -------------------- 淺色 / 深色主題管理 --------------------
+      function getActiveTheme() {
+        return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+      }
+
+      function applyTheme(theme, persist) {
+        const normalized = theme === 'dark' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', normalized);
+        if (persist) {
+          try {
+            localStorage.setItem(THEME_STORAGE_KEY, normalized);
+          } catch (err) {
+            // 忽略儲存限制
+          }
+        }
+        renderThemeButtons();
+      }
+
+      function renderThemeButtons() {
+        const current = getActiveTheme();
+        document.querySelectorAll('.theme-choice-btn').forEach((btn) => {
+          const isSelected = btn.dataset.themeChoice === current;
+          btn.setAttribute('aria-pressed', String(isSelected));
+          btn.className = isSelected
+            ? 'theme-choice-btn px-2.5 py-1 rounded-lg text-xs font-semibold bg-white text-slate-900 shadow-2xs transition-all'
+            : 'theme-choice-btn px-2.5 py-1 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-900 transition-all';
+        });
+      }
+
+      function initThemeSystem() {
+        renderThemeButtons();
+        if (window.matchMedia) {
+          const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+          const handleSystemThemeChange = (e) => {
+            try {
+              const userSaved = localStorage.getItem(THEME_STORAGE_KEY);
+              if (userSaved !== 'light' && userSaved !== 'dark') {
+                applyTheme(e.matches ? 'dark' : 'light', false);
+              }
+            } catch (err) {
+              applyTheme(e.matches ? 'dark' : 'light', false);
+            }
+          };
+          if (typeof mediaQuery.addEventListener === 'function') {
+            mediaQuery.addEventListener('change', handleSystemThemeChange);
+          }
+        }
+      }
+
+      // -------------------- 設備與報修常數定義 --------------------
+      const FACILITY_META = {
+        shower: {
+          label: '淋浴間',
+          shortName: '淋浴',
+          durationSec: 15 * 60,
+          durationMins: 15,
+          faultReasons: ['無熱水／水溫異常', '排水孔堵塞／積水', '門鎖／蓮蓬頭損壞', '漏水／異常噪音']
+        },
+        washer: {
+          label: '洗衣機',
+          shortName: '洗衣',
+          durationSec: 40 * 60,
+          durationMins: 40,
+          faultReasons: ['無法啟動／不脫水', '排水異常／積水', '漏水／異常噪音', '門蓋無法緊閉']
+        }
+      };
+
+      const STATUS_BADGE = {
+        available: { text: '空閒', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200/80' },
+        reserved: { text: '保留中', cls: 'bg-amber-50 text-amber-700 border-amber-200/80' },
+        in_use: { text: '使用中', cls: 'bg-sky-50 text-sky-700 border-sky-200/80' },
+        maintenance: { text: '維修中', cls: 'bg-rose-50 text-rose-700 border-rose-200/80' }
+      };
+
+      const TICKET_STATUS_META = {
+        pending: { text: '⏳ 待管理員判定', cls: 'bg-amber-50 text-amber-700 border-amber-200/80' },
+        approved_maintenance: { text: '🔨 已判定故障（維修中）', cls: 'bg-rose-50 text-rose-700 border-rose-200/80' },
+        rejected: { text: '👌 判定正常（已駁回）', cls: 'bg-slate-100 text-slate-600 border-slate-200' },
+        resolved: { text: '✅ 已修復結案', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200/80' }
+      };
+
+      const FAULT_SAMPLE_DESCRIPTIONS = {
+        '無熱水／水溫異常': '開啟熱水等待約 3 分鐘仍全為冷水，且水壓明顯偏弱，無法正常淋浴。',
+        '排水孔堵塞／積水': '地面排水孔疑似毛髮堵塞，淋浴時積水淹過腳踝且退水極慢。',
+        '門鎖／蓮蓬頭損壞': '內側門閂卡住難以扣緊，且蓮蓬頭軟管接縫處持續噴水。',
+        '無法啟動／不脫水': '啟動後面板閃爍錯誤代碼，進入脫水行程時內槽滾筒不會旋轉。',
+        '漏水／異常噪音': '運轉時機身劇烈震動並發出金屬摩擦聲，底部持續有滲水現象。',
+        '其他故障': '設備通電反應異常，操作面板按鍵無反應，請管理員協助檢修。'
+      };
+
+      // -------------------- 狀態初始化與本地持久化 --------------------
+      let adminAuthenticated = false;
+      let welcomeState = {
+        tab: 'student',
+        selectedGender: '',
+        showLoginPassword: false
+      };
+
+      let modalContext = {
+        faultUnitId: null,
+        selectedFaultReason: '',
+        waitlistBuildingId: '',
+        waitlistFloor: '',
+        waitlistType: 'shower',
+        addUnitBuildingId: '',
+        addUnitFloor: '',
+        addUnitType: 'shower',
+        configBuildingId: '',
+        confirmDeleteBuildingId: null,
+        confirmDeleteFloorName: null,
+        editingFloorName: null,
+        showAuthModalPasswords: false
+      };
+
+      function createDefaultUnitsForFloor(buildingId, floor, countEach = 2) {
+        const units = [];
+        for (let i = 1; i <= countEach; i++) {
+          const num = String(i).padStart(2, '0');
+          units.push({
+            id: `${buildingId}-${floor}-S${num}`,
+            buildingId,
+            floor,
+            type: 'shower',
+            name: `${floor}-淋浴間${num}`,
+            status: 'available',
+            userRoom: '',
+            userName: '',
+            remainingSec: 0,
+            extended: false,
+            faultReason: '',
+            reportedBy: ''
+          });
+        }
+        for (let i = 0; i < countEach; i++) {
+          const letter = String.fromCharCode(65 + i);
+          units.push({
+            id: `${buildingId}-${floor}-W${letter}`,
+            buildingId,
+            floor,
+            type: 'washer',
+            name: `${floor}-洗衣機${letter}`,
+            status: 'available',
+            userRoom: '',
+            userName: '',
+            remainingSec: 0,
+            extended: false,
+            faultReason: '',
+            reportedBy: ''
+          });
+        }
+        return units;
+      }
+
+      function getInitialState() {
+        const buildings = [
+          { id: 'bldg-male-a', name: '男宿A棟', gender: 'male', floors: ['2F', '3F', '4F'] },
+          { id: 'bldg-female-b', name: '女宿B棟', gender: 'female', floors: ['2F', '3F'] }
+        ];
+
+        const units = [
+          // 男宿A棟 3F（預設展示主力樓層）
+          { id: 'ma-3f-s01', buildingId: 'bldg-male-a', floor: '3F', type: 'shower', name: '3F-淋浴間01', status: 'in_use', userRoom: '305', userName: '陳冠宇', remainingSec: 8 * 60 + 25, extended: false, faultReason: '', reportedBy: '' },
+          { id: 'ma-3f-s02', buildingId: 'bldg-male-a', floor: '3F', type: 'shower', name: '3F-淋浴間02', status: 'available', userRoom: '', userName: '', remainingSec: 0, extended: false, faultReason: '', reportedBy: '' },
+          { id: 'ma-3f-s03', buildingId: 'bldg-male-a', floor: '3F', type: 'shower', name: '3F-淋浴間03', status: 'reserved', userRoom: '311', userName: '張哲維', remainingSec: 3 * 60 + 40, extended: false, faultReason: '', reportedBy: '' },
+          { id: 'ma-3f-s04', buildingId: 'bldg-male-a', floor: '3F', type: 'shower', name: '3F-淋浴間04', status: 'maintenance', userRoom: '', userName: '', remainingSec: 0, extended: false, faultReason: '無熱水／水溫異常', reportedBy: '308房 李柏翰' },
+
+          { id: 'ma-3f-wa', buildingId: 'bldg-male-a', floor: '3F', type: 'washer', name: '3F-洗衣機A', status: 'in_use', userRoom: '301', userName: '黃子軒', remainingSec: 12 * 60 + 10, extended: false, faultReason: '', reportedBy: '' },
+          { id: 'ma-3f-wb', buildingId: 'bldg-male-a', floor: '3F', type: 'washer', name: '3F-洗衣機B', status: 'in_use', userRoom: '307', userName: '吳宇恩', remainingSec: 27 * 60 + 45, extended: false, faultReason: '', reportedBy: '' },
+
+          // 男宿A棟 2F & 4F
+          ...createDefaultUnitsForFloor('bldg-male-a', '2F', 2),
+          ...createDefaultUnitsForFloor('bldg-male-a', '4F', 2),
+
+          // 女宿B棟 2F & 3F
+          { id: 'fb-2f-s01', buildingId: 'bldg-female-b', floor: '2F', type: 'shower', name: '2F-淋浴間01', status: 'available', userRoom: '', userName: '', remainingSec: 0, extended: false, faultReason: '', reportedBy: '' },
+          { id: 'fb-2f-s02', buildingId: 'bldg-female-b', floor: '2F', type: 'shower', name: '2F-淋浴間02', status: 'in_use', userRoom: '208', userName: '陳品妍', remainingSec: 6 * 60 + 50, extended: false, faultReason: '', reportedBy: '' },
+          { id: 'fb-2f-s03', buildingId: 'bldg-female-b', floor: '2F', type: 'shower', name: '2F-淋浴間03', status: 'available', userRoom: '', userName: '', remainingSec: 0, extended: false, faultReason: '', reportedBy: '' },
+          { id: 'fb-2f-wa', buildingId: 'bldg-female-b', floor: '2F', type: 'washer', name: '2F-洗衣機A', status: 'in_use', userRoom: '203', userName: '許芸熙', remainingSec: 18 * 60 + 15, extended: false, faultReason: '', reportedBy: '' },
+          { id: 'fb-2f-wb', buildingId: 'bldg-female-b', floor: '2F', type: 'washer', name: '2F-洗衣機B', status: 'available', userRoom: '', userName: '', remainingSec: 0, extended: false, faultReason: '', reportedBy: '' },
+          ...createDefaultUnitsForFloor('bldg-female-b', '3F', 2)
+        ];
+
+        const waitlist = [
+          { id: 'w-init-1', buildingId: 'bldg-male-a', floor: '3F', type: 'washer', room: '309', name: '周柏宇', joinedAt: '20:32' }
+        ];
+
+        const tickets = [
+          {
+            id: 'DQ-1024',
+            buildingId: 'bldg-male-a',
+            floor: '3F',
+            unitId: 'ma-3f-wb',
+            unitName: '3F-洗衣機B',
+            unitType: 'washer',
+            reporterRoom: '307',
+            reporterName: '吳宇恩',
+            faultType: '漏水／異常噪音',
+            urgency: 'urgent',
+            description: '高速脫水時機身震動非常大，右側底部有少量滲水，建議本輪洗完後檢修。',
+            status: 'pending',
+            createdAt: '20:41',
+            adminNote: '',
+            reviewedAt: ''
+          },
+          {
+            id: 'DQ-1023',
+            buildingId: 'bldg-male-a',
+            floor: '3F',
+            unitId: 'ma-3f-s04',
+            unitName: '3F-淋浴間04',
+            unitType: 'shower',
+            reporterRoom: '308',
+            reporterName: '李柏翰',
+            faultType: '無熱水／水溫異常',
+            urgency: 'normal',
+            description: '熱水閥轉到底等待五分鐘仍只有冷水，已確認其他間熱水正常。',
+            status: 'approved_maintenance',
+            createdAt: '19:15',
+            adminNote: '已確認混水閥故障，已通知水電廠商明日上午更換零件。',
+            reviewedAt: '19:28'
+          },
+          {
+            id: 'DQ-1022',
+            buildingId: 'bldg-female-b',
+            floor: '2F',
+            unitId: 'fb-2f-wa',
+            unitName: '2F-洗衣機A',
+            unitType: 'washer',
+            reporterRoom: '210',
+            reporterName: '張語彤',
+            faultType: '無法啟動／不脫水',
+            urgency: 'normal',
+            description: '按啟動鍵沒有反應，螢幕沒有亮燈。',
+            status: 'pending',
+            createdAt: '20:48',
+            adminNote: '',
+            reviewedAt: ''
+          }
+        ];
+
+        const logs = [
+          { id: 'log-1', time: '20:48', category: '學生報修', message: '女宿B棟 2F-洗衣機A 提交報修單 #DQ-1022「無法啟動／不脫水」（由 210房 張語彤 通報，待判定）' },
+          { id: 'log-2', time: '20:41', category: '學生報修', message: '男宿A棟 3F-洗衣機B 提交報修單 #DQ-1024「漏水／異常噪音」（由 307房 吳宇恩 通報，待判定）' },
+          { id: 'log-3', time: '19:28', category: '報修判定', message: '管理員判定 #DQ-1023 為故障，將 男宿A棟 3F-淋浴間04 轉為「維修中」' }
+        ];
+
+        return {
+          screen: 'welcome',
+          role: 'student',
+          currentUser: null,
+          adminCredentials: { ...DEFAULT_ADMIN_CREDS },
+          studentTab: 'board',
+          adminTab: 'monitor',
+          studentTicketFilter: 'all',
+          adminTicketFilter: 'pending',
+          selectedBuildingId: 'bldg-male-a',
+          selectedFloor: '3F',
+          buildings,
+          units,
+          waitlist,
+          tickets,
+          logs,
+          logsCollapsed: false,
+          demoOpen: false
+        };
+      }
+
+      function loadState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return getInitialState();
+          const parsed = JSON.parse(raw);
+          const fallback = getInitialState();
+          return {
+            ...fallback,
+            ...parsed,
+            screen: 'welcome',
+            role: 'student',
+            adminCredentials:
+              parsed.adminCredentials && parsed.adminCredentials.username && parsed.adminCredentials.password
+                ? parsed.adminCredentials
+                : fallback.adminCredentials,
+            buildings: Array.isArray(parsed.buildings) && parsed.buildings.length > 0 ? parsed.buildings : fallback.buildings,
+            units: Array.isArray(parsed.units) ? parsed.units : fallback.units,
+            waitlist: Array.isArray(parsed.waitlist) ? parsed.waitlist : fallback.waitlist,
+            tickets: Array.isArray(parsed.tickets) ? parsed.tickets : fallback.tickets,
+            logs: Array.isArray(parsed.logs) ? parsed.logs : fallback.logs
+          };
+        } catch (err) {
+          return getInitialState();
+        }
+      }
+
+      function saveState() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (err) {
+          // 忽略儲存空間限制
+        }
+      }
+
+      let state = loadState();
+
+      // -------------------- 通用工具函式 --------------------
+      function escapeHtml(str) {
+        return String(str ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function formatMMSS(totalSec) {
+        const safe = Math.max(0, Math.floor(totalSec));
+        const mins = Math.floor(safe / 60);
+        const secs = safe % 60;
+        return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      }
+
+      function getNowHHMM() {
+        const now = new Date();
+        return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      }
+
+      function generateTicketCode() {
+        const num = Math.floor(1025 + Math.random() * 8970);
+        return `DQ-${num}`;
+      }
+
+      function addSystemLog(category, message) {
+        state.logs.unshift({
+          id: 'log-' + Date.now() + '-' + Math.random().toString(36).slice(2, 5),
+          time: getNowHHMM(),
+          category,
+          message
+        });
+        if (state.logs.length > 60) {
+          state.logs.length = 60;
+        }
+      }
+
+      function getBuildingName(buildingId) {
+        const b = state.buildings.find((item) => item.id === buildingId);
+        return b ? b.name : '未知棟別';
+      }
+
+      function getVisibleBuildings() {
+        if (state.role === 'admin') {
+          return state.buildings;
+        }
+        const gender = state.currentUser ? state.currentUser.gender : 'male';
+        return state.buildings.filter((b) => b.gender === gender);
+      }
+
+      function getSelectedBuilding() {
+        const visible = getVisibleBuildings();
+        if (visible.length === 0) return null;
+        let found = visible.find((b) => b.id === state.selectedBuildingId);
+        if (!found) {
+          found = visible[0];
+          state.selectedBuildingId = found.id;
+        }
+        if (!found.floors.includes(state.selectedFloor)) {
+          state.selectedFloor = found.floors[0] || '1F';
+        }
+        return found;
+      }
+
+      function isCurrentUser(room, name) {
+        if (!state.currentUser) return false;
+        return state.currentUser.room === room && state.currentUser.name === name;
+      }
+
+      function hasPendingTicketForUnit(unitId) {
+        return state.tickets.some((t) => t.unitId === unitId && t.status === 'pending');
+      }
+
+      function estimateWaitMins(buildingId, floor, type, queueIndex) {
+        const activeUnits = state.units.filter(
+          (u) =>
+            u.buildingId === buildingId &&
+            u.floor === floor &&
+            u.type === type &&
+            (u.status === 'in_use' || u.status === 'reserved')
+        );
+        if (activeUnits.length === 0) return FACILITY_META[type].durationMins;
+        const sortedSecs = activeUnits.map((u) => Math.max(60, u.remainingSec)).sort((a, b) => a - b);
+        const slotIdx = queueIndex % sortedSecs.length;
+        const rounds = Math.floor(queueIndex / sortedSecs.length);
+        const totalSec = sortedSecs[slotIdx] + rounds * FACILITY_META[type].durationSec;
+        return Math.max(1, Math.ceil(totalSec / 60));
+      }
+
+      function showLineToast(title, body) {
+        const container = document.getElementById('toastContainer');
+        if (!container) return;
+
+        const toast = document.createElement('div');
+        toast.className =
+          'pointer-events-auto bg-white border border-[#E2E8F0] rounded-2xl shadow-lg p-3.5 space-y-1 animate-toast-in';
+        toast.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <p class="text-xs font-bold text-slate-900 leading-snug">${escapeHtml(title)}</p>
+            <button type="button" class="text-slate-400 hover:text-slate-600 text-xs leading-none shrink-0">✕</button>
+          </div>
+          <p class="text-[11px] text-slate-500 leading-relaxed">${escapeHtml(body)}</p>
+        `;
+
+        const dismiss = () => {
+          if (!toast.parentNode) return;
+          toast.classList.remove('animate-toast-in');
+          toast.classList.add('animate-toast-out');
+          setTimeout(() => toast.remove(), 200);
+        };
+
+        toast.querySelector('button').addEventListener('click', dismiss);
+        container.appendChild(toast);
+        setTimeout(dismiss, 4500);
+      }
+
+      function openModal(modalId) {
+        const el = document.getElementById(modalId);
+        if (el) el.classList.remove('hidden');
+      }
+
+      function closeModal(modalId) {
+        const el = document.getElementById(modalId);
+        if (el) el.classList.add('hidden');
+      }
+
+      // -------------------- 1. 歡迎與身分設定畫面邏輯 --------------------
+      function openWelcomeScreen(defaultTab, prefillUser) {
+        state.screen = 'welcome';
+        welcomeState.tab = defaultTab || 'student';
+        if (prefillUser) {
+          document.getElementById('setupNameInput').value = prefillUser.name || '';
+          document.getElementById('setupRoomInput').value = prefillUser.room || '';
+          welcomeState.selectedGender = prefillUser.gender || '';
+        }
+        saveState();
+        renderAll();
+      }
+
+      function renderWelcomeScreen() {
+        const isStudentTab = welcomeState.tab === 'student';
+        const tabStudent = document.getElementById('welcomeTabStudent');
+        const tabAdmin = document.getElementById('welcomeTabAdmin');
+        const panelStudent = document.getElementById('welcomeStudentPanel');
+        const panelAdmin = document.getElementById('welcomeAdminPanel');
+
+        tabStudent.className = isStudentTab
+          ? 'py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold bg-white text-slate-900 shadow-2xs transition-all'
+          : 'py-2 px-3 rounded-xl text-xs sm:text-sm font-medium text-slate-500 hover:text-slate-800 transition-all';
+
+        tabAdmin.className = !isStudentTab
+          ? 'py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold bg-white text-slate-900 shadow-2xs transition-all'
+          : 'py-2 px-3 rounded-xl text-xs sm:text-sm font-medium text-slate-500 hover:text-slate-800 transition-all';
+
+        panelStudent.classList.toggle('hidden', !isStudentTab);
+        panelAdmin.classList.toggle('hidden', isStudentTab);
+
+        document.querySelectorAll('.setup-gender-card').forEach((card) => {
+          const g = card.dataset.setupGender;
+          const selected = welcomeState.selectedGender === g;
+          if (selected && g === 'male') {
+            card.className =
+              'setup-gender-card p-3.5 rounded-2xl border-2 border-sky-500 bg-sky-50/50 text-left transition-all flex flex-col gap-1';
+          } else if (selected && g === 'female') {
+            card.className =
+              'setup-gender-card p-3.5 rounded-2xl border-2 border-rose-500 bg-rose-50/50 text-left transition-all flex flex-col gap-1';
+          } else {
+            card.className =
+              'setup-gender-card p-3.5 rounded-2xl border border-[#E2E8F0] bg-white hover:bg-slate-50 text-left transition-all flex flex-col gap-1';
+          }
+        });
+
+        const hintEl = document.getElementById('currentAdminHintText');
+        if (hintEl) {
+          hintEl.textContent = `目前儲存帳號：${state.adminCredentials.username}`;
+        }
+      }
+
+      function enterAsStudent(name, room, gender) {
+        adminAuthenticated = false;
+        state.role = 'student';
+        state.screen = 'app';
+        state.studentTab = 'board';
+        state.currentUser = { name, room, gender };
+
+        const matchedBldgs = state.buildings.filter((b) => b.gender === gender);
+        if (matchedBldgs.length > 0) {
+          state.selectedBuildingId = matchedBldgs[0].id;
+          state.selectedFloor = matchedBldgs[0].floors.includes('3F')
+            ? '3F'
+            : matchedBldgs[0].floors[0] || '1F';
+        }
+
+        saveState();
+        renderAll();
+      }
+
+      function enterAsAdmin() {
+        adminAuthenticated = true;
+        state.role = 'admin';
+        state.screen = 'app';
+        state.adminTab = 'monitor';
+        if (state.buildings.length > 0 && !state.buildings.some((b) => b.id === state.selectedBuildingId)) {
+          state.selectedBuildingId = state.buildings[0].id;
+          state.selectedFloor = state.buildings[0].floors[0] || '1F';
+        }
+        saveState();
+        renderAll();
+      }
+
+      // -------------------- 2. 設備預約、使用、延長與候補自動遞補 --------------------
+      function reserveUnit(unitId) {
+        if (!state.currentUser) return;
+        const unit = state.units.find((u) => u.id === unitId);
+        if (!unit || unit.status !== 'available') return;
+
+        const bldg = state.buildings.find((b) => b.id === unit.buildingId);
+        if (bldg && bldg.gender !== state.currentUser.gender) {
+          showLineToast('性別分流限制', '無法預約異性宿舍區設備。');
+          return;
+        }
+
+        const alreadyActiveSameType = state.units.find(
+          (u) =>
+            u.type === unit.type &&
+            isCurrentUser(u.userRoom, u.userName) &&
+            (u.status === 'reserved' || u.status === 'in_use')
+        );
+        if (alreadyActiveSameType) {
+          showLineToast(
+            `每人同時限預約一台${FACILITY_META[unit.type].label}`,
+            `您目前已持有「${alreadyActiveSameType.name}」，請先結束或取消後再預約。`
+          );
+          return;
+        }
+
+        unit.status = 'reserved';
+        unit.userRoom = state.currentUser.room;
+        unit.userName = state.currentUser.name;
+        unit.remainingSec = HOLD_SECONDS;
+        unit.extended = false;
+
+        // 若原本在同層同類候補名單中，自動移除
+        state.waitlist = state.waitlist.filter(
+          (w) =>
+            !(
+              w.buildingId === unit.buildingId &&
+              w.floor === unit.floor &&
+              w.type === unit.type &&
+              isCurrentUser(w.room, w.name)
+            )
+        );
+
+        const bName = getBuildingName(unit.buildingId);
+        saveState();
+        renderAll();
+        showLineToast(
+          `已預約保留 ${bName} ${unit.name}`,
+          '請於 5 分鐘內抵達現場並點擊「確認開始使用」，逾時將自動釋出。'
+        );
+      }
+
+      function checkInUnit(unitId) {
+        const unit = state.units.find((u) => u.id === unitId);
+        if (!unit || unit.status !== 'reserved') return;
+
+        unit.status = 'in_use';
+        unit.remainingSec = FACILITY_META[unit.type].durationSec;
+        unit.extended = false;
+
+        const bName = getBuildingName(unit.buildingId);
+        saveState();
+        renderAll();
+        showLineToast(
+          `開始計時：${bName} ${unit.name}`,
+          `已進入使用中狀態（${FACILITY_META[unit.type].durationMins} 分鐘），結束後請記得點擊「結束使用」。`
+        );
+      }
+
+      function extendUnitOnce(unitId) {
+        const unit = state.units.find((u) => u.id === unitId);
+        if (!unit || unit.status !== 'in_use' || unit.extended) return;
+
+        unit.remainingSec += 5 * 60;
+        unit.extended = true;
+
+        const bName = getBuildingName(unit.buildingId);
+        saveState();
+        renderAll();
+        showLineToast(`已延長 5 分鐘`, `${bName} ${unit.name} 使用時間已增加 5 分鐘（每輪限延長一次）。`);
+      }
+
+      function releaseUnitAndPromote(unit, reason) {
+        const bName = getBuildingName(unit.buildingId);
+        const nextIdx = state.waitlist.findIndex(
+          (w) => w.buildingId === unit.buildingId && w.floor === unit.floor && w.type === unit.type
+        );
+
+        if (nextIdx !== -1) {
+          const nextUser = state.waitlist.splice(nextIdx, 1)[0];
+          unit.status = 'reserved';
+          unit.userRoom = nextUser.room;
+          unit.userName = nextUser.name;
+          unit.remainingSec = HOLD_SECONDS;
+          unit.extended = false;
+          unit.faultReason = '';
+          unit.reportedBy = '';
+
+          addSystemLog(
+            '候補遞補',
+            `${bName} ${unit.name} 已釋出並自動保留給候補第一位（${nextUser.room}房 ${nextUser.name}）`
+          );
+          showLineToast(
+            `📲 LINE 宿速排遞補通知：${bName} ${unit.name} 已保留給 ${nextUser.room}房 ${nextUser.name}`,
+            '請於 5 分鐘內確認開始使用，逾時將自動遞補下一位。'
+          );
+          return;
+        }
+
+        unit.status = 'available';
+        unit.userRoom = '';
+        unit.userName = '';
+        unit.remainingSec = 0;
+        unit.extended = false;
+        unit.faultReason = '';
+        unit.reportedBy = '';
+
+        if (reason === 'cancelled') {
+          showLineToast(`已取消預約`, `${bName} ${unit.name} 已重新恢復為空閒狀態。`);
+        } else if (reason === 'finished') {
+          showLineToast(`已結束使用`, `感謝配合！${bName} ${unit.name} 已恢復空閒。`);
+        } else if (reason === 'timeout') {
+          showLineToast(`預約保留逾時釋出`, `${bName} ${unit.name} 因超過 5 分鐘未報到已自動釋出。`);
+        }
+      }
+
+      function cancelOrFinishUnit(unitId) {
+        const unit = state.units.find((u) => u.id === unitId);
+        if (!unit || (unit.status !== 'reserved' && unit.status !== 'in_use')) return;
+
+        const prevStatus = unit.status;
+        releaseUnitAndPromote(unit, prevStatus === 'reserved' ? 'cancelled' : 'finished');
+        saveState();
+        renderAll();
+      }
+
+      function adminForceRelease(unitId) {
+        const unit = state.units.find((u) => u.id === unitId);
+        if (!unit || (unit.status !== 'reserved' && unit.status !== 'in_use')) return;
+
+        const bName = getBuildingName(unit.buildingId);
+        const prevOwner = `${unit.userRoom}房 ${unit.userName}`;
+        addSystemLog('管理員操作', `強制釋出 ${bName} ${unit.name}（原使用者：${prevOwner}）`);
+        releaseUnitAndPromote(unit, 'admin_force');
+        saveState();
+        renderAll();
+      }
+
+      function joinWaitlist(buildingId, floor, type) {
+        if (!state.currentUser) return;
+
+        const bldg = state.buildings.find((b) => b.id === buildingId);
+        if (bldg && bldg.gender !== state.currentUser.gender) {
+          showLineToast('性別分流限制', '無法加入異性宿舍區候補名單。');
+          return;
+        }
+
+        const exists = state.waitlist.some(
+          (w) =>
+            w.buildingId === buildingId &&
+            w.floor === floor &&
+            w.type === type &&
+            isCurrentUser(w.room, w.name)
+        );
+        if (exists) return;
+
+        const alreadyActive = state.units.find(
+          (u) =>
+            u.buildingId === buildingId &&
+            u.floor === floor &&
+            u.type === type &&
+            isCurrentUser(u.userRoom, u.userName) &&
+            (u.status === 'reserved' || u.status === 'in_use')
+        );
+        if (alreadyActive) {
+          showLineToast('無需重複排隊', `您目前已持有「${alreadyActive.name}」的使用權限。`);
+          return;
+        }
+
+        const queueLen = state.waitlist.filter(
+          (w) => w.buildingId === buildingId && w.floor === floor && w.type === type
+        ).length;
+        const est = estimateWaitMins(buildingId, floor, type, queueLen);
+        const bName = getBuildingName(buildingId);
+
+        state.waitlist.push({
+          id: 'w-' + Date.now() + '-' + Math.random().toString(36).slice(2, 5),
+          buildingId,
+          floor,
+          type,
+          room: state.currentUser.room,
+          name: state.currentUser.name,
+          joinedAt: getNowHHMM()
+        });
+
+        saveState();
+        renderAll();
+        showLineToast(
+          `📲 LINE 宿速排通知：已加入 ${bName} ${floor} ${FACILITY_META[type].shortName}候補`,
+          `目前排在第 ${queueLen + 1} 位，預估等待約 ${est} 分鐘。`
+        );
+      }
+
+      function leaveWaitlist(waitId, byAdmin) {
+        const target = state.waitlist.find((w) => w.id === waitId);
+        if (!target) return;
+        const bName = getBuildingName(target.buildingId);
+        state.waitlist = state.waitlist.filter((w) => w.id !== waitId);
+        if (byAdmin) {
+          addSystemLog('管理員操作', `將 ${target.room}房 ${target.name} 自 ${bName} ${target.floor} ${FACILITY_META[target.type].label}候補名單移除`);
+        } else {
+          showLineToast('已退出候補排隊', `您已取消 ${bName} ${target.floor} ${FACILITY_META[target.type].label}候補。`);
+        }
+        saveState();
+        renderAll();
+      }
+
+      // -------------------- 3. 學生報修單填寫 & 管理員報修審核判定 --------------------
+      function openNewTicketModal(preselectedUnitId) {
+        if (!state.currentUser) return;
+        const visibleBldgs = getVisibleBuildings();
+        if (visibleBldgs.length === 0) {
+          showLineToast('尚無可報修棟別', '目前尚未設定符合您性別的宿舍棟別。');
+          return;
+        }
+
+        const bldgSelect = document.getElementById('ticketBuildingSelect');
+        const floorSelect = document.getElementById('ticketFloorSelect');
+        const unitSelect = document.getElementById('ticketUnitSelect');
+        const faultSelect = document.getElementById('ticketFaultTypeSelect');
+        const descInput = document.getElementById('ticketDescriptionInput');
+        const errEl = document.getElementById('newTicketError');
+
+        errEl.classList.add('hidden');
+        descInput.value = '';
+        document.querySelector('input[name="ticketUrgency"][value="normal"]').checked = true;
+
+        let initialBldgId = state.selectedBuildingId;
+        let initialFloor = state.selectedFloor;
+        let initialUnitId = preselectedUnitId || '';
+
+        if (preselectedUnitId) {
+          const targetUnit = state.units.find((u) => u.id === preselectedUnitId);
+          if (targetUnit) {
+            initialBldgId = targetUnit.buildingId;
+            initialFloor = targetUnit.floor;
+          }
+        }
+
+        if (!visibleBldgs.some((b) => b.id === initialBldgId)) {
+          initialBldgId = visibleBldgs[0].id;
+        }
+
+        bldgSelect.innerHTML = visibleBldgs
+          .map((b) => `<option value="${b.id}" ${b.id === initialBldgId ? 'selected' : ''}>${escapeHtml(b.name)}</option>`)
+          .join('');
+
+        populateTicketFloors(initialBldgId, initialFloor);
+        populateTicketUnits(initialBldgId, floorSelect.value, initialUnitId);
+
+        // 依設備類型自動推薦預設故障類型
+        const selectedUnit = state.units.find((u) => u.id === unitSelect.value);
+        if (selectedUnit && selectedUnit.type === 'washer') {
+          faultSelect.value = '無法啟動／不脫水';
+        } else {
+          faultSelect.value = '無熱水／水溫異常';
+        }
+
+        openModal('newTicketModal');
+      }
+
+      function populateTicketFloors(buildingId, preferredFloor) {
+        const bldg = state.buildings.find((b) => b.id === buildingId);
+        const floorSelect = document.getElementById('ticketFloorSelect');
+        if (!bldg || !floorSelect) return;
+
+        const targetFloor = bldg.floors.includes(preferredFloor) ? preferredFloor : bldg.floors[0] || '1F';
+        floorSelect.innerHTML = bldg.floors
+          .map((fl) => `<option value="${escapeHtml(fl)}" ${fl === targetFloor ? 'selected' : ''}>${escapeHtml(fl)}</option>`)
+          .join('');
+      }
+
+      function populateTicketUnits(buildingId, floor, preferredUnitId) {
+        const unitSelect = document.getElementById('ticketUnitSelect');
+        if (!unitSelect) return;
+
+        const units = state.units.filter((u) => u.buildingId === buildingId && u.floor === floor);
+        if (units.length === 0) {
+          unitSelect.innerHTML = `<option value="">（此樓層尚無設備）</option>`;
+          return;
+        }
+
+        unitSelect.innerHTML = units
+          .map((u) => {
+            const typeTag = u.type === 'shower' ? '🚿' : '🧺';
+            const statusTag = u.status === 'maintenance' ? '（已維修中）' : '';
+            return `<option value="${u.id}" ${u.id === preferredUnitId ? 'selected' : ''}>${typeTag} ${escapeHtml(u.name)}${statusTag}</option>`;
+          })
+          .join('');
+      }
+
+      function submitNewTicket() {
+        if (!state.currentUser) return;
+        const buildingId = document.getElementById('ticketBuildingSelect').value;
+        const floor = document.getElementById('ticketFloorSelect').value;
+        const unitId = document.getElementById('ticketUnitSelect').value;
+        const faultType = document.getElementById('ticketFaultTypeSelect').value;
+        const urgencyRadio = document.querySelector('input[name="ticketUrgency"]:checked');
+        const urgency = urgencyRadio ? urgencyRadio.value : 'normal';
+        const description = document.getElementById('ticketDescriptionInput').value.trim();
+        const errEl = document.getElementById('newTicketError');
+
+        const unit = state.units.find((u) => u.id === unitId);
+        if (!unit) {
+          errEl.textContent = '請選擇有效的故障設備。';
+          errEl.classList.remove('hidden');
+          return;
+        }
+        if (!description) {
+          errEl.textContent = '請填寫詳細問題描述，或點擊「✨ 快速範例填入」。';
+          errEl.classList.remove('hidden');
+          return;
+        }
+
+        const ticketCode = generateTicketCode();
+        const bName = getBuildingName(buildingId);
+
+        const newTicket = {
+          id: ticketCode,
+          buildingId,
+          floor,
+          unitId: unit.id,
+          unitName: unit.name,
+          unitType: unit.type,
+          reporterRoom: state.currentUser.room,
+          reporterName: state.currentUser.name,
+          faultType,
+          urgency,
+          description,
+          status: 'pending',
+          createdAt: getNowHHMM(),
+          adminNote: '',
+          reviewedAt: ''
+        };
+
+        state.tickets.unshift(newTicket);
+        addSystemLog(
+          '學生報修',
+          `${bName} ${unit.name} 提交報修單 #${ticketCode}「${faultType}」（由 ${state.currentUser.room}房 ${state.currentUser.name} 通報，待判定）`
+        );
+
+        closeModal('newTicketModal');
+        state.studentTab = 'repairs';
+        state.studentTicketFilter = 'all';
+        saveState();
+        renderAll();
+        showLineToast(
+          `📲 LINE 宿速排通知：已送出報修單 #${ticketCode}`,
+          `${bName} ${unit.name}（${faultType}）已送交管理員審核判定。`
+        );
+      }
+
+      // 管理員判定報修單
+      function reviewTicketDecision(ticketId, decision, noteText) {
+        const ticket = state.tickets.find((t) => t.id === ticketId);
+        if (!ticket) return;
+
+        const unit = state.units.find((u) => u.id === ticket.unitId);
+        const bName = getBuildingName(ticket.buildingId);
+        const cleanNote = (noteText || '').trim();
+        const now = getNowHHMM();
+
+        if (decision === 'approve_fault') {
+          ticket.status = 'approved_maintenance';
+          ticket.adminNote = cleanNote || '已確認設備異常，安排維修人員檢修中。';
+          ticket.reviewedAt = now;
+
+          if (unit) {
+            const hadActiveUser =
+              (unit.status === 'reserved' || unit.status === 'in_use') && unit.userRoom
+                ? `${unit.userRoom}房 ${unit.userName}`
+                : '';
+
+            unit.status = 'maintenance';
+            unit.userRoom = '';
+            unit.userName = '';
+            unit.remainingSec = 0;
+            unit.extended = false;
+            unit.faultReason = ticket.faultType;
+            unit.reportedBy = `${ticket.reporterRoom}房 ${ticket.reporterName}`;
+
+            if (hadActiveUser) {
+              showLineToast(
+                `📲 LINE 宿速排通知：${bName} ${unit.name} 已停機維修`,
+                `原 ${hadActiveUser} 的預約／使用已自動取消，請改用其他空閒設備。`
+              );
+            }
+          }
+
+          addSystemLog(
+            '報修判定',
+            `管理員判定 #${ticket.id} 為故障，將 ${bName} ${ticket.unitName} 轉為「維修中」（備註：${ticket.adminNote}）`
+          );
+          showLineToast(
+            `已判定 #${ticket.id} 為故障並停機`,
+            `${bName} ${ticket.unitName} 已轉為「維修中」狀態。`
+          );
+        } else if (decision === 'reject') {
+          ticket.status = 'rejected';
+          ticket.adminNote = cleanNote || '現場測試功能運作正常，無異常狀況。';
+          ticket.reviewedAt = now;
+
+          addSystemLog(
+            '報修判定',
+            `管理員判定 #${ticket.id}（${bName} ${ticket.unitName}）運作正常並駁回報修（備註：${ticket.adminNote}）`
+          );
+          showLineToast(
+            `已駁回報修單 #${ticket.id}`,
+            `${bName} ${ticket.unitName} 維持正常運作開放使用。`
+          );
+        } else if (decision === 'resolve') {
+          ticket.status = 'resolved';
+          if (cleanNote) {
+            ticket.adminNote = cleanNote;
+          } else if (!ticket.adminNote) {
+            ticket.adminNote = '已完成零件檢修並測試正常，重新開放使用。';
+          }
+          ticket.reviewedAt = now;
+
+          if (unit && unit.status === 'maintenance') {
+            unit.faultReason = '';
+            unit.reportedBy = '';
+            releaseUnitAndPromote(unit, 'repaired');
+          }
+
+          addSystemLog(
+            '維修完成',
+            `管理員完成 #${ticket.id} 檢修，將 ${bName} ${ticket.unitName} 恢復上線`
+          );
+          showLineToast(
+            `✅ #${ticket.id} 已修復結案並上線`,
+            `${bName} ${ticket.unitName} 已恢復正常開放預約。`
+          );
+        }
+
+        saveState();
+        renderAll();
+      }
+
+      // 管理員在設備卡片直接手動設為維修中
+      function openFaultModal(unitId) {
+        const unit = state.units.find((u) => u.id === unitId);
+        if (!unit || unit.status === 'maintenance') return;
+
+        modalContext.faultUnitId = unitId;
+        const reasons = FACILITY_META[unit.type].faultReasons;
+        modalContext.selectedFaultReason = reasons[0];
+
+        document.getElementById('faultModalTitle').textContent = `設為維修中 · ${unit.name}`;
+        document.getElementById('faultModalSubtitle').textContent = '請選擇停機檢修原因，設備將立即暫停開放學生預約。';
+
+        document.getElementById('faultReasonOptions').innerHTML = reasons
+          .map(
+            (r, idx) => `
+            <label class="flex items-center gap-3 p-3 rounded-xl border border-[#E2E8F0] hover:bg-slate-50 cursor-pointer transition-colors">
+              <input type="radio" name="faultReasonRadio" value="${escapeHtml(r)}" ${idx === 0 ? 'checked' : ''} class="accent-rose-600" />
+              <span class="text-xs sm:text-sm font-medium text-slate-800">${escapeHtml(r)}</span>
+            </label>
+          `
+          )
+          .join('');
+
+        openModal('faultModal');
+      }
+
+      function submitAdminManualFault() {
+        const unit = state.units.find((u) => u.id === modalContext.faultUnitId);
+        if (!unit) return;
+
+        const checked = document.querySelector('input[name="faultReasonRadio"]:checked');
+        const reason = checked ? checked.value : modalContext.selectedFaultReason;
+
+        unit.status = 'maintenance';
+        unit.userRoom = '';
+        unit.userName = '';
+        unit.remainingSec = 0;
+        unit.extended = false;
+        unit.faultReason = reason;
+        unit.reportedBy = '管理員設定';
+
+        const bName = getBuildingName(unit.buildingId);
+        addSystemLog('管理員操作', `手動將 ${bName} ${unit.name} 設為維修中（原因：${reason}）`);
+        showLineToast(`已將 ${bName} ${unit.name} 設為維修中`, `停機原因：${reason}`);
+
+        closeModal('faultModal');
+        saveState();
+        renderAll();
+      }
+
+      function markUnitRepaired(unitId) {
+        const unit = state.units.find((u) => u.id === unitId);
+        if (!unit || unit.status !== 'maintenance') return;
+
+        const bName = getBuildingName(unit.buildingId);
+        unit.faultReason = '';
+        unit.reportedBy = '';
+
+        // 同步將關聯的維修中報修單標記為已修復結案
+        state.tickets.forEach((t) => {
+          if (t.unitId === unit.id && t.status === 'approved_maintenance') {
+            t.status = 'resolved';
+            t.reviewedAt = getNowHHMM();
+            if (!t.adminNote) t.adminNote = '已完成檢修並重新開放上線。';
+          }
+        });
+
+        addSystemLog('維修完成', `管理員已將 ${bName} ${unit.name} 標記修復並重新上線`);
+        releaseUnitAndPromote(unit, 'repaired');
+        if (unit.status === 'available') {
+          showLineToast(`✅ ${bName} ${unit.name} 已修復上線`, '設備已恢復正常運作並開放預約。');
+        }
+        saveState();
+        renderAll();
+      }
+
+      // -------------------- 4. 管理員：帳號密碼自訂設定 --------------------
+      function openAdminAuthModal() {
+        modalContext.showAuthModalPasswords = false;
+        document.getElementById('authCurrentPassInput').value = '';
+        document.getElementById('authNewUserInput').value = state.adminCredentials.username;
+        document.getElementById('authNewPassInput').value = '';
+        document.getElementById('authConfirmPassInput').value = '';
+        document.getElementById('adminAuthError').classList.add('hidden');
+
+        ['authCurrentPassInput', 'authNewPassInput', 'authConfirmPassInput'].forEach((id) => {
+          document.getElementById(id).type = 'password';
+        });
+        document.getElementById('toggleAuthModalPassBtn').textContent = '👁️ 顯示密碼';
+
+        openModal('adminAuthModal');
+        setTimeout(() => document.getElementById('authCurrentPassInput').focus(), 50);
+      }
+
+      function submitAdminAuthUpdate() {
+        const currentPass = document.getElementById('authCurrentPassInput').value;
+        const newUser = document.getElementById('authNewUserInput').value.trim();
+        const newPass = document.getElementById('authNewPassInput').value;
+        const confirmPass = document.getElementById('authConfirmPassInput').value;
+        const errEl = document.getElementById('adminAuthError');
+
+        if (currentPass !== state.adminCredentials.password) {
+          errEl.textContent = '目前密碼驗證失敗，請重新輸入正確的目前密碼。';
+          errEl.classList.remove('hidden');
+          return;
+        }
+        if (newUser.length < 3) {
+          errEl.textContent = '新管理員帳號長度至少需 3 個字元。';
+          errEl.classList.remove('hidden');
+          return;
+        }
+        if (newPass.length < 4) {
+          errEl.textContent = '新密碼長度至少需 4 個字元。';
+          errEl.classList.remove('hidden');
+          return;
+        }
+        if (newPass !== confirmPass) {
+          errEl.textContent = '兩次輸入的新密碼不一致，請重新確認。';
+          errEl.classList.remove('hidden');
+          return;
+        }
+
+        const oldUser = state.adminCredentials.username;
+        state.adminCredentials = {
+          username: newUser,
+          password: newPass
+        };
+
+        addSystemLog(
+          '帳密設定',
+          oldUser === newUser
+            ? `管理員（${newUser}）已更新登入密碼`
+            : `管理員帳號已由「${oldUser}」變更為「${newUser}」並更新密碼`
+        );
+
+        closeModal('adminAuthModal');
+        saveState();
+        renderAll();
+        showLineToast('🔐 管理員帳密設定已儲存', `新登入帳號為「${newUser}」，下次登入請使用新帳密。`);
+      }
+
+      // -------------------- 5. 管理員：候補名單 / 新增設備 / 棟別樓層管理 --------------------
+      function openWaitlistModal(buildingId, floor, type) {
+        modalContext.waitlistBuildingId = buildingId;
+        modalContext.waitlistFloor = floor;
+        modalContext.waitlistType = type;
+        renderWaitlistModalContent();
+        openModal('waitlistModal');
+      }
+
+      function renderWaitlistModalContent() {
+        const { waitlistBuildingId: buildingId, waitlistFloor: floor, waitlistType: type } = modalContext;
+        const titleEl = document.getElementById('waitlistModalTitle');
+        const bodyEl = document.getElementById('waitlistModalBody');
+        const clearBtn = document.getElementById('clearCategoryWaitlistBtn');
+        const bName = getBuildingName(buildingId);
+
+        const list = state.waitlist.filter(
+          (w) => w.buildingId === buildingId && w.floor === floor && w.type === type
+        );
+        titleEl.textContent = `${bName} ${floor} ${FACILITY_META[type].label}候補名單（${list.length} 人）`;
+        clearBtn.classList.toggle('hidden', list.length === 0);
+
+        if (list.length === 0) {
+          bodyEl.innerHTML = `<p class="text-xs text-slate-400 py-6 text-center">目前無任何住宿生排隊候補中。</p>`;
+          return;
+        }
+
+        bodyEl.innerHTML = list
+          .map(
+            (w, idx) => `
+            <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-[#E2E8F0]">
+              <div class="flex items-center gap-2.5">
+                <span class="w-6 h-6 rounded-full bg-slate-900 text-white text-xs font-bold flex items-center justify-center">${idx + 1}</span>
+                <div>
+                  <p class="text-xs sm:text-sm font-semibold text-slate-900">${escapeHtml(w.room)}房 - ${escapeHtml(w.name)}</p>
+                  <p class="text-[11px] text-slate-400">加入時間 ${escapeHtml(w.joinedAt || '--:--')} · 預估等待約 ${estimateWaitMins(buildingId, floor, type, idx)} 分鐘</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                data-admin-remove-wait="${w.id}"
+                class="px-2.5 py-1 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-100/70 transition-colors"
+              >移除</button>
+            </div>
+          `
+          )
+          .join('');
+      }
+
+      function openAddUnitModal(buildingId, floor, type) {
+        modalContext.addUnitBuildingId = buildingId;
+        modalContext.addUnitFloor = floor;
+        modalContext.addUnitType = type;
+
+        const existingCount = state.units.filter(
+          (u) => u.buildingId === buildingId && u.floor === floor && u.type === type
+        ).length;
+        const suggestion =
+          type === 'shower'
+            ? `${floor}-淋浴間${String(existingCount + 1).padStart(2, '0')}`
+            : `${floor}-洗衣機${String.fromCharCode(65 + existingCount)}`;
+
+        const bName = getBuildingName(buildingId);
+        document.getElementById('addUnitModalTitle').textContent = `新增 ${bName} ${floor} ${FACILITY_META[type].label}`;
+        const input = document.getElementById('newUnitNameInput');
+        input.value = suggestion;
+        openModal('addUnitModal');
+        setTimeout(() => input.focus(), 50);
+      }
+
+      function addNewUnit(name) {
+        const cleanName = name.trim();
+        if (!cleanName) return;
+
+        const { addUnitBuildingId: buildingId, addUnitFloor: floor, addUnitType: type } = modalContext;
+        const bName = getBuildingName(buildingId);
+        const newUnit = {
+          id: `${buildingId}-${floor}-${type === 'shower' ? 'S' : 'W'}-${Date.now()}`,
+          buildingId,
+          floor,
+          type,
+          name: cleanName,
+          status: 'available',
+          userRoom: '',
+          userName: '',
+          remainingSec: 0,
+          extended: false,
+          faultReason: '',
+          reportedBy: ''
+        };
+
+        state.units.push(newUnit);
+        addSystemLog('管理員操作', `新增設備「${bName} ${cleanName}」（${FACILITY_META[type].label}）`);
+        releaseUnitAndPromote(newUnit, 'new_unit');
+        saveState();
+        renderAll();
+        showLineToast(`已新增 ${bName} ${cleanName}`, '新設備已加入看板並開放使用。');
+      }
+
+      function deleteUnit(unitId) {
+        const unit = state.units.find((u) => u.id === unitId);
+        if (!unit || unit.status === 'in_use' || unit.status === 'reserved') return;
+
+        const bName = getBuildingName(unit.buildingId);
+        state.units = state.units.filter((u) => u.id !== unitId);
+        addSystemLog('管理員操作', `刪除設備「${bName} ${unit.name}」`);
+        saveState();
+        renderAll();
+        showLineToast(`已移除 ${bName} ${unit.name}`, '該設備已自樓層清單中刪除。');
+      }
+
+      function openBuildingConfigModal() {
+        modalContext.configBuildingId = state.selectedBuildingId;
+        modalContext.confirmDeleteBuildingId = null;
+        modalContext.confirmDeleteFloorName = null;
+        modalContext.editingFloorName = null;
+        renderBuildingConfigModal();
+        openModal('buildingModal');
+      }
+
+      function addNewBuilding(rawName, gender, rawFloors, autoCreateUnits) {
+        const name = rawName.trim();
+        if (!name) return;
+
+        const parsedFloors = rawFloors
+          .split(/[,，、\s]+/)
+          .map((f) => f.trim())
+          .filter(Boolean);
+        const uniqueFloors = [...new Set(parsedFloors)];
+        if (uniqueFloors.length === 0) uniqueFloors.push('1F');
+
+        const newId = 'bldg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 5);
+        state.buildings.push({
+          id: newId,
+          name,
+          gender: gender === 'female' ? 'female' : 'male',
+          floors: uniqueFloors
+        });
+
+        if (autoCreateUnits) {
+          uniqueFloors.forEach((fl) => {
+            state.units.push(...createDefaultUnitsForFloor(newId, fl, 2));
+          });
+        }
+
+        state.selectedBuildingId = newId;
+        state.selectedFloor = uniqueFloors[0];
+        modalContext.configBuildingId = newId;
+        modalContext.confirmDeleteBuildingId = null;
+        modalContext.confirmDeleteFloorName = null;
+        modalContext.editingFloorName = null;
+
+        const genderText = gender === 'female' ? '女宿' : '男宿';
+        addSystemLog(
+          '棟別設定',
+          `新增${genderText}「${name}」（樓層：${uniqueFloors.join('、')}${autoCreateUnits ? '，已自動建立預設設備' : ''}）`
+        );
+        saveState();
+        renderAll();
+        renderBuildingConfigModal();
+        showLineToast(`已新增${genderText}「${name}」`, `包含 ${uniqueFloors.length} 個樓層，已切換至該棟別看板。`);
+      }
+
+      function updateBuildingMeta(buildingId, newName, newGender) {
+        const clean = newName.trim();
+        const bldg = state.buildings.find((b) => b.id === buildingId);
+        if (!bldg || !clean) return;
+
+        const oldName = bldg.name;
+        const oldGender = bldg.gender;
+        bldg.name = clean;
+        bldg.gender = newGender === 'female' ? 'female' : 'male';
+
+        const genderLabel = bldg.gender === 'male' ? '男宿' : '女宿';
+        if (oldName !== clean || oldGender !== bldg.gender) {
+          addSystemLog('棟別設定', `更新棟別設定：「${clean}」（性別歸屬：${genderLabel}）`);
+        }
+        saveState();
+        renderAll();
+        renderBuildingConfigModal();
+        showLineToast('棟別設定已更新', `「${clean}」目前歸屬為${genderLabel}。`);
+      }
+
+      function deleteBuilding(buildingId) {
+        if (state.buildings.length <= 1) return;
+        const target = state.buildings.find((b) => b.id === buildingId);
+        if (!target) return;
+
+        state.buildings = state.buildings.filter((b) => b.id !== buildingId);
+        state.units = state.units.filter((u) => u.buildingId !== buildingId);
+        state.waitlist = state.waitlist.filter((w) => w.buildingId !== buildingId);
+        state.tickets = state.tickets.filter((t) => t.buildingId !== buildingId);
+
+        if (state.selectedBuildingId === buildingId) {
+          state.selectedBuildingId = state.buildings[0].id;
+          state.selectedFloor = state.buildings[0].floors[0] || '1F';
+        }
+        modalContext.configBuildingId = state.selectedBuildingId;
+        modalContext.confirmDeleteBuildingId = null;
+
+        addSystemLog('棟別設定', `刪除棟別「${target.name}」及其所有樓層設備`);
+        saveState();
+        renderAll();
+        renderBuildingConfigModal();
+        showLineToast(`已刪除棟別「${target.name}」`, '相關設備與排隊資料已同步清理。');
+      }
+
+      function addFloorToBuilding(buildingId, rawFloor, autoCreateUnits) {
+        const floorName = rawFloor.trim();
+        const bldg = state.buildings.find((b) => b.id === buildingId);
+        if (!bldg || !floorName) return;
+
+        if (bldg.floors.includes(floorName)) {
+          showLineToast('樓層名稱重複', `${bldg.name} 已存在「${floorName}」。`);
+          return;
+        }
+
+        bldg.floors.push(floorName);
+        if (autoCreateUnits) {
+          state.units.push(...createDefaultUnitsForFloor(buildingId, floorName, 2));
+        }
+
+        state.selectedBuildingId = buildingId;
+        state.selectedFloor = floorName;
+
+        addSystemLog(
+          '樓層設定',
+          `${bldg.name} 新增樓層「${floorName}」${autoCreateUnits ? '（已自動建立淋浴與洗衣設備各 2 台）' : ''}`
+        );
+        saveState();
+        renderAll();
+        renderBuildingConfigModal();
+        showLineToast(`已新增 ${bldg.name} ${floorName}`, autoCreateUnits ? '已自動建立預設淋浴間與洗衣機。' : '新樓層已加入。');
+      }
+
+      function renameFloorInBuilding(buildingId, oldFloor, rawNewFloor) {
+        const newFloor = rawNewFloor.trim();
+        const bldg = state.buildings.find((b) => b.id === buildingId);
+        if (!bldg || !newFloor) return;
+
+        if (oldFloor === newFloor) {
+          modalContext.editingFloorName = null;
+          renderBuildingConfigModal();
+          return;
+        }
+
+        if (bldg.floors.includes(newFloor)) {
+          showLineToast('樓層名稱重複', `${bldg.name} 已存在「${newFloor}」。`);
+          return;
+        }
+
+        const idx = bldg.floors.indexOf(oldFloor);
+        if (idx !== -1) bldg.floors[idx] = newFloor;
+
+        state.units.forEach((u) => {
+          if (u.buildingId === buildingId && u.floor === oldFloor) {
+            u.floor = newFloor;
+            if (u.name.startsWith(oldFloor + '-')) {
+              u.name = newFloor + '-' + u.name.slice(oldFloor.length + 1);
+            }
+          }
+        });
+
+        state.waitlist.forEach((w) => {
+          if (w.buildingId === buildingId && w.floor === oldFloor) {
+            w.floor = newFloor;
+          }
+        });
+
+        state.tickets.forEach((t) => {
+          if (t.buildingId === buildingId && t.floor === oldFloor) {
+            t.floor = newFloor;
+            if (t.unitName.startsWith(oldFloor + '-')) {
+              t.unitName = newFloor + '-' + t.unitName.slice(oldFloor.length + 1);
+            }
+          }
+        });
+
+        if (state.selectedBuildingId === buildingId && state.selectedFloor === oldFloor) {
+          state.selectedFloor = newFloor;
+        }
+
+        modalContext.editingFloorName = null;
+        addSystemLog('樓層設定', `${bldg.name} 樓層「${oldFloor}」更名為「${newFloor}」`);
+        saveState();
+        renderAll();
+        renderBuildingConfigModal();
+        showLineToast('樓層名稱已更新', `已將 ${bldg.name}「${oldFloor}」更新為「${newFloor}」。`);
+      }
+
+      function moveFloorInBuilding(buildingId, floorName, direction) {
+        const bldg = state.buildings.find((b) => b.id === buildingId);
+        if (!bldg) return;
+        const idx = bldg.floors.indexOf(floorName);
+        const targetIdx = idx + direction;
+        if (idx === -1 || targetIdx < 0 || targetIdx >= bldg.floors.length) return;
+
+        const temp = bldg.floors[idx];
+        bldg.floors[idx] = bldg.floors[targetIdx];
+        bldg.floors[targetIdx] = temp;
+
+        saveState();
+        renderAll();
+        renderBuildingConfigModal();
+      }
+
+      function deleteFloorFromBuilding(buildingId, floorName) {
+        const bldg = state.buildings.find((b) => b.id === buildingId);
+        if (!bldg || bldg.floors.length <= 1) return;
+
+        bldg.floors = bldg.floors.filter((f) => f !== floorName);
+        state.units = state.units.filter((u) => !(u.buildingId === buildingId && u.floor === floorName));
+        state.waitlist = state.waitlist.filter((w) => !(w.buildingId === buildingId && w.floor === floorName));
+        state.tickets = state.tickets.filter((t) => !(t.buildingId === buildingId && t.floor === floorName));
+
+        if (state.selectedBuildingId === buildingId && state.selectedFloor === floorName) {
+          state.selectedFloor = bldg.floors[0];
+        }
+
+        modalContext.confirmDeleteFloorName = null;
+        addSystemLog('樓層設定', `刪除 ${bldg.name} 的「${floorName}」樓層及該層設備`);
+        saveState();
+        renderAll();
+        renderBuildingConfigModal();
+        showLineToast(`已刪除 ${bldg.name} ${floorName}`, '該樓層設備與排隊資料已同步移除。');
+      }
+
+      function renderBuildingConfigModal() {
+        const selectorEl = document.getElementById('modalBuildingSelector');
+        const detailEl = document.getElementById('modalBuildingDetail');
+        if (!selectorEl || !detailEl) return;
+
+        let activeBldg = state.buildings.find((b) => b.id === modalContext.configBuildingId);
+        if (!activeBldg) {
+          activeBldg = state.buildings[0];
+          modalContext.configBuildingId = activeBldg.id;
+        }
+
+        selectorEl.innerHTML = state.buildings
+          .map((b) => {
+            const active = b.id === activeBldg.id;
+            const tag =
+              b.gender === 'female'
+                ? `<span class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/80">女宿</span>`
+                : `<span class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-200/80">男宿</span>`;
+            return `
+              <button
+                type="button"
+                data-config-select-bldg="${b.id}"
+                class="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all inline-flex items-center gap-1.5 ${
+                  active ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                }"
+              >
+                <span>${escapeHtml(b.name)}</span>
+                ${tag}
+              </button>
+            `;
+          })
+          .join('');
+
+        const canDeleteBuilding = state.buildings.length > 1;
+        const isConfirmingBldgDelete = modalContext.confirmDeleteBuildingId === activeBldg.id;
+
+        const floorRowsHtml = activeBldg.floors
+          .map((fl, idx) => {
+            const showerCnt = state.units.filter((u) => u.buildingId === activeBldg.id && u.floor === fl && u.type === 'shower').length;
+            const washerCnt = state.units.filter((u) => u.buildingId === activeBldg.id && u.floor === fl && u.type === 'washer').length;
+            const isEditing = modalContext.editingFloorName === fl;
+            const isConfirmingFloorDel = modalContext.confirmDeleteFloorName === fl;
+            const canDeleteFloor = activeBldg.floors.length > 1;
+
+            if (isEditing) {
+              return `
+                <div class="p-3 rounded-xl bg-slate-50 border border-slate-300 flex flex-wrap items-center justify-between gap-2">
+                  <div class="flex items-center gap-2 flex-1 min-w-[160px]">
+                    <input
+                      type="text"
+                      id="inlineEditFloorInput"
+                      value="${escapeHtml(fl)}"
+                      maxlength="12"
+                      class="w-28 px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 text-xs font-semibold text-slate-900 focus:outline-none focus:border-slate-900"
+                    />
+                    <span class="text-[11px] text-slate-400">修改後將同步更新該層設備名稱</span>
+                  </div>
+                  <div class="flex items-center gap-1.5">
+                    <button type="button" data-save-floor-rename="${escapeHtml(fl)}" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold">儲存</button>
+                    <button type="button" data-cancel-floor-rename="1" class="px-2.5 py-1.5 rounded-lg text-slate-500 hover:bg-slate-200/70 text-xs">取消</button>
+                  </div>
+                </div>
+              `;
+            }
+
+            if (isConfirmingFloorDel) {
+              return `
+                <div class="p-3 rounded-xl bg-rose-50 border border-rose-200 flex flex-wrap items-center justify-between gap-2">
+                  <span class="text-xs font-medium text-rose-700">確定刪除 <strong>${escapeHtml(fl)}</strong> 及該層 ${showerCnt + washerCnt} 台設備？</span>
+                  <div class="flex items-center gap-1.5">
+                    <button type="button" data-confirm-delete-floor="${escapeHtml(fl)}" class="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold">確認刪除</button>
+                    <button type="button" data-cancel-delete-floor="1" class="px-2.5 py-1 rounded-lg bg-white text-slate-600 border border-slate-200 text-xs">取消</button>
+                  </div>
+                </div>
+              `;
+            }
+
+            return `
+              <div class="p-3 rounded-xl bg-white border border-[#E2E8F0] flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-2.5">
+                  <span class="px-2.5 py-0.5 rounded-lg bg-slate-100 text-slate-800 text-xs font-bold">${escapeHtml(fl)}</span>
+                  <span class="text-xs text-slate-500">淋浴 ${showerCnt} 間 · 洗衣 ${washerCnt} 台</span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <button
+                    type="button"
+                    data-move-floor="${escapeHtml(fl)}"
+                    data-dir="-1"
+                    ${idx === 0 ? 'disabled' : ''}
+                    title="上移"
+                    class="px-2 py-1 rounded-lg text-xs text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none"
+                  >↑</button>
+                  <button
+                    type="button"
+                    data-move-floor="${escapeHtml(fl)}"
+                    data-dir="1"
+                    ${idx === activeBldg.floors.length - 1 ? 'disabled' : ''}
+                    title="下移"
+                    class="px-2 py-1 rounded-lg text-xs text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none"
+                  >↓</button>
+                  <button
+                    type="button"
+                    data-start-edit-floor="${escapeHtml(fl)}"
+                    class="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+                  >改名</button>
+                  ${
+                    canDeleteFloor
+                      ? `<button type="button" data-ask-delete-floor="${escapeHtml(fl)}" class="px-2.5 py-1 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors">刪除</button>`
+                      : `<span class="px-2 py-1 text-[11px] text-slate-300" title="至少需保留一個樓層">保留</span>`
+                  }
+                </div>
+              </div>
+            `;
+          })
+          .join('');
+
+        detailEl.innerHTML = `
+          <div class="p-4 rounded-2xl border border-[#E2E8F0] bg-white space-y-3">
+            <div class="flex flex-wrap items-end justify-between gap-3">
+              <div class="flex-1 min-w-[200px]">
+                <label for="renameBuildingInput" class="block text-[11px] font-medium text-slate-500 mb-1">棟別名稱</label>
+                <input
+                  type="text"
+                  id="renameBuildingInput"
+                  value="${escapeHtml(activeBldg.name)}"
+                  maxlength="20"
+                  class="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] text-xs sm:text-sm font-semibold text-slate-900 focus:outline-none focus:border-slate-900"
+                />
+              </div>
+
+              <div class="space-y-1">
+                <span class="block text-[11px] font-medium text-slate-500">性別歸屬</span>
+                <div class="inline-flex bg-slate-100 p-0.5 rounded-xl border border-slate-200/80">
+                  <label class="px-2.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1.5 ${
+                    activeBldg.gender === 'male' ? 'bg-white text-sky-700 shadow-2xs' : 'text-slate-500'
+                  }">
+                    <input type="radio" name="editBuildingGender" value="male" ${activeBldg.gender === 'male' ? 'checked' : ''} class="sr-only" />
+                    <span>👨 男宿</span>
+                  </label>
+                  <label class="px-2.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1.5 ${
+                    activeBldg.gender === 'female' ? 'bg-white text-rose-700 shadow-2xs' : 'text-slate-500'
+                  }">
+                    <input type="radio" name="editBuildingGender" value="female" ${activeBldg.gender === 'female' ? 'checked' : ''} class="sr-only" />
+                    <span>👩 女宿</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+              <button
+                type="button"
+                id="saveBuildingMetaBtn"
+                class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors"
+              >儲存棟別設定</button>
+
+              ${
+                canDeleteBuilding
+                  ? `<button
+                      type="button"
+                      id="askDeleteBuildingBtn"
+                      class="px-3 py-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-medium transition-colors"
+                    >刪除棟別</button>`
+                  : `<span class="text-[11px] text-slate-400">至少須保留一棟宿舍</span>`
+              }
+            </div>
+
+            ${
+              isConfirmingBldgDelete
+                ? `<div class="p-3 rounded-xl bg-rose-50 border border-rose-200 flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-xs font-medium text-rose-700">確定刪除「<strong>${escapeHtml(activeBldg.name)}</strong>」及其所有樓層與設備？</span>
+                    <div class="flex items-center gap-1.5">
+                      <button type="button" id="confirmDeleteBuildingBtn" class="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold">確認刪除</button>
+                      <button type="button" id="cancelDeleteBuildingBtn" class="px-2.5 py-1 rounded-lg bg-white text-slate-600 border border-slate-200 text-xs">取消</button>
+                    </div>
+                  </div>`
+                : ''
+            }
+          </div>
+
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-slate-700">${escapeHtml(activeBldg.name)} · 樓層列表</span>
+              <span class="text-[11px] text-slate-400">共 ${activeBldg.floors.length} 個樓層</span>
+            </div>
+
+            <div class="space-y-2">${floorRowsHtml}</div>
+
+            <form id="addFloorToBuildingForm" class="pt-2 flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2 flex-1 min-w-[220px]">
+                <input
+                  type="text"
+                  id="newFloorNameInput"
+                  maxlength="12"
+                  required
+                  placeholder="輸入新樓層（如 5F、B1）"
+                  class="w-40 px-3 py-2 rounded-xl border border-[#E2E8F0] text-xs focus:outline-none focus:border-slate-900"
+                />
+                <label class="inline-flex items-center gap-1.5 text-[11px] text-slate-500 cursor-pointer select-none">
+                  <input type="checkbox" id="newFloorAutoUnits" checked class="rounded accent-slate-900" />
+                  <span>自動建預設設備各 2 台</span>
+                </label>
+              </div>
+              <button
+                type="submit"
+                class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors"
+              >+ 新增樓層</button>
+            </form>
+          </div>
+        `;
+      }
+
+      // -------------------- 每秒即時倒數與展示快轉 --------------------
+      function tickSeconds(deltaSec) {
+        let dirty = false;
+        state.units.forEach((unit) => {
+          if (unit.status === 'reserved' || unit.status === 'in_use') {
+            dirty = true;
+            unit.remainingSec -= deltaSec;
+            if (unit.remainingSec <= 0) {
+              const prev = unit.status;
+              releaseUnitAndPromote(unit, prev === 'reserved' ? 'timeout' : 'finished');
+            }
+          }
+        });
+        if (dirty) {
+          saveState();
+          renderAll();
+        }
+      }
+
+      setInterval(() => tickSeconds(1), 1000);
+
+      function simulateOneCompletion() {
+        const currentFloorActive = state.units
+          .filter(
+            (u) =>
+              u.buildingId === state.selectedBuildingId &&
+              u.floor === state.selectedFloor &&
+              (u.status === 'in_use' || u.status === 'reserved')
+          )
+          .sort((a, b) => a.remainingSec - b.remainingSec);
+
+        const visibleIds = new Set(getVisibleBuildings().map((b) => b.id));
+        const fallbackActive = state.units
+          .filter((u) => visibleIds.has(u.buildingId) && (u.status === 'in_use' || u.status === 'reserved'))
+          .sort((a, b) => a.remainingSec - b.remainingSec);
+
+        const target = currentFloorActive[0] || fallbackActive[0];
+
+        if (!target) {
+          showLineToast('目前無使用中設備', '目前可視棟別內皆為空閒或維修狀態。');
+          return;
+        }
+
+        const prevStatus = target.status;
+        releaseUnitAndPromote(target, prevStatus === 'reserved' ? 'timeout' : 'finished');
+        saveState();
+        renderAll();
+      }
+
+      // -------------------- 主渲染函式 --------------------
+      function renderAll() {
+        const welcomeEl = document.getElementById('welcomeScreen');
+        const appEl = document.getElementById('appShell');
+
+        if (state.screen === 'welcome') {
+          welcomeEl.classList.remove('hidden');
+          appEl.classList.add('hidden');
+          renderWelcomeScreen();
+          return;
+        }
+
+        welcomeEl.classList.add('hidden');
+        appEl.classList.remove('hidden');
+
+        getSelectedBuilding();
+        renderTopBar();
+        renderViewVisibility();
+        renderContextBars();
+
+        if (state.role === 'student' && state.studentTab === 'repairs') {
+          renderStudentRepairView();
+        } else if (state.role === 'admin' && state.adminTab === 'reviews') {
+          renderAdminReviewView();
+        } else {
+          renderFacilitySection('shower', 'showerGrid', 'showerAvailPill', 'showerHeaderActions');
+          renderFacilitySection('washer', 'washerGrid', 'washerAvailPill', 'washerHeaderActions');
+        }
+
+        renderAdminLogsSection();
+        renderDemoPopover();
+      }
+
+      function renderTopBar() {
+        const isAdmin = state.role === 'admin';
+        const activeBldg = getSelectedBuilding();
+        const visibleBuildings = getVisibleBuildings();
+
+        const brandDot = document.getElementById('brandDot');
+        const studentIdentityPill = document.getElementById('studentIdentityPill');
+        const studentIdentityText = document.getElementById('studentIdentityText');
+        const adminIdentityPill = document.getElementById('adminIdentityPill');
+        const adminIdentityText = document.getElementById('adminIdentityText');
+
+        const studentMainTabs = document.getElementById('studentMainTabs');
+        const adminMainTabs = document.getElementById('adminMainTabs');
+        const adminConfigActions = document.getElementById('adminConfigActions');
+        const genderFilterBadge = document.getElementById('genderFilterBadge');
+
+        brandDot.className = isAdmin
+          ? 'w-2.5 h-2.5 rounded-full bg-amber-500 transition-colors'
+          : 'w-2.5 h-2.5 rounded-full bg-emerald-500 transition-colors';
+
+        if (isAdmin) {
+          studentIdentityPill.classList.add('hidden');
+          adminIdentityPill.classList.remove('hidden');
+          adminIdentityPill.classList.add('inline-flex');
+          adminIdentityText.textContent = `🛠️ 管理員 (${state.adminCredentials.username})`;
+
+          studentMainTabs.classList.add('hidden');
+          adminMainTabs.classList.remove('hidden');
+          adminMainTabs.classList.add('inline-flex');
+
+          adminConfigActions.classList.remove('hidden');
+          adminConfigActions.classList.add('flex');
+
+          // 更新管理員分頁高亮與待判定徽章
+          document.querySelectorAll('.admin-tab-btn').forEach((btn) => {
+            const active = btn.dataset.adminTab === state.adminTab;
+            btn.className = active
+              ? 'admin-tab-btn px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-900 shadow-2xs transition-all inline-flex items-center gap-1.5'
+              : 'admin-tab-btn px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition-all inline-flex items-center gap-1.5';
+          });
+
+          const pendingCount = state.tickets.filter((t) => t.status === 'pending').length;
+          const pendingBadge = document.getElementById('adminPendingBadge');
+          if (pendingCount > 0) {
+            pendingBadge.textContent = String(pendingCount);
+            pendingBadge.classList.remove('hidden');
+          } else {
+            pendingBadge.classList.add('hidden');
+          }
+
+          genderFilterBadge.className =
+            'px-2.5 py-1 rounded-lg text-[11px] font-semibold border bg-amber-50 text-amber-800 border-amber-200/80 shrink-0';
+          genderFilterBadge.textContent = '🛠️ 全館檢視：男宿＋女宿';
+        } else {
+          adminIdentityPill.classList.add('hidden');
+          adminIdentityPill.classList.remove('inline-flex');
+          studentIdentityPill.classList.remove('hidden');
+
+          adminMainTabs.classList.add('hidden');
+          adminMainTabs.classList.remove('inline-flex');
+          studentMainTabs.classList.remove('hidden');
+          studentMainTabs.classList.add('inline-flex');
+
+          adminConfigActions.classList.add('hidden');
+          adminConfigActions.classList.remove('flex');
+
+          // 更新學生分頁高亮與報修處理中徽章
+          document.querySelectorAll('.student-tab-btn').forEach((btn) => {
+            const active = btn.dataset.studentTab === state.studentTab;
+            btn.className = active
+              ? 'student-tab-btn px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-900 shadow-2xs transition-all inline-flex items-center gap-1.5'
+              : 'student-tab-btn px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition-all inline-flex items-center gap-1.5';
+          });
+
+          const visibleBldgIds = new Set(visibleBuildings.map((b) => b.id));
+          const activeRepairCnt = state.tickets.filter(
+            (t) => visibleBldgIds.has(t.buildingId) && (t.status === 'pending' || t.status === 'approved_maintenance')
+          ).length;
+          const studentRepairBadge = document.getElementById('studentRepairBadge');
+          if (activeRepairCnt > 0) {
+            studentRepairBadge.textContent = String(activeRepairCnt);
+            studentRepairBadge.classList.remove('hidden');
+          } else {
+            studentRepairBadge.classList.add('hidden');
+          }
+
+          const u = state.currentUser || { gender: 'male', room: '302', name: '王小明' };
+          const isFemale = u.gender === 'female';
+          studentIdentityText.textContent = `${isFemale ? '👩 女性' : '👨 男性'} · ${u.room}房 ${u.name}`;
+
+          genderFilterBadge.className = isFemale
+            ? 'px-2.5 py-1 rounded-lg text-[11px] font-semibold border bg-rose-50 text-rose-700 border-rose-200/80 shrink-0'
+            : 'px-2.5 py-1 rounded-lg text-[11px] font-semibold border bg-sky-50 text-sky-700 border-sky-200/80 shrink-0';
+          genderFilterBadge.textContent = isFemale ? '👩 依性別顯示：女宿' : '👨 依性別顯示：男宿';
+        }
+
+        // 渲染棟別 tabs
+        const buildingTabsEl = document.getElementById('buildingTabs');
+        if (visibleBuildings.length === 0) {
+          buildingTabsEl.innerHTML = `<span class="px-2.5 py-1 text-xs text-slate-400">尚無對應性別棟別</span>`;
+        } else {
+          buildingTabsEl.innerHTML = visibleBuildings
+            .map((b) => {
+              const active = activeBldg && b.id === activeBldg.id;
+              const adminGenderTag = isAdmin
+                ? b.gender === 'female'
+                  ? `<span class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/80">女宿</span>`
+                  : `<span class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-200/80">男宿</span>`
+                : '';
+
+              return `
+                <button
+                  type="button"
+                  data-select-building="${b.id}"
+                  class="px-2.5 sm:px-3 py-1 rounded-lg text-xs font-semibold transition-all inline-flex items-center gap-1.5 ${
+                    active ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  }"
+                >
+                  <span>${escapeHtml(b.name)}</span>
+                  ${adminGenderTag}
+                </button>
+              `;
+            })
+            .join('');
+        }
+
+        // 渲染樓層 pills
+        const floorPillsEl = document.getElementById('floorPills');
+        if (!activeBldg) {
+          floorPillsEl.innerHTML = '';
+        } else {
+          floorPillsEl.innerHTML = activeBldg.floors
+            .map((fl) => {
+              const active = fl === state.selectedFloor;
+              return `
+                <button
+                  type="button"
+                  data-select-floor="${escapeHtml(fl)}"
+                  class="px-2.5 py-1 rounded-full text-xs font-semibold transition-all border ${
+                    active
+                      ? 'bg-slate-900 text-white border-slate-900'
+                      : 'bg-white text-slate-600 border-[#E2E8F0] hover:border-slate-300 hover:text-slate-900'
+                  }"
+                >${escapeHtml(fl)}</button>
+              `;
+            })
+            .join('');
+        }
+      }
+
+      function renderViewVisibility() {
+        const isBoardVisible =
+          (state.role === 'student' && state.studentTab === 'board') ||
+          (state.role === 'admin' && state.adminTab === 'monitor');
+
+        document.getElementById('locationFilterBar').classList.toggle('hidden', !isBoardVisible);
+        document.getElementById('facilityBoardView').classList.toggle('hidden', !isBoardVisible);
+
+        document
+          .getElementById('studentRepairView')
+          .classList.toggle('hidden', !(state.role === 'student' && state.studentTab === 'repairs'));
+
+        document
+          .getElementById('adminReviewView')
+          .classList.toggle('hidden', !(state.role === 'admin' && state.adminTab === 'reviews'));
+      }
+
+      function renderContextBars() {
+        const myStatusBar = document.getElementById('myStatusBar');
+        const myStatusContent = document.getElementById('myStatusContent');
+        const adminSummaryBar = document.getElementById('adminSummaryBar');
+        const adminSummaryContent = document.getElementById('adminSummaryContent');
+        const activeBldg = getSelectedBuilding();
+
+        if (state.role === 'admin') {
+          myStatusBar.classList.add('hidden');
+          if (state.adminTab !== 'monitor') {
+            adminSummaryBar.classList.add('hidden');
+            return;
+          }
+          adminSummaryBar.classList.remove('hidden');
+
+          if (!activeBldg) {
+            adminSummaryContent.innerHTML = `<span class="text-slate-500">請先新增宿舍棟別。</span>`;
+            return;
+          }
+
+          const floorUnits = state.units.filter(
+            (u) => u.buildingId === activeBldg.id && u.floor === state.selectedFloor
+          );
+          const normalCount = floorUnits.filter((u) => u.status !== 'maintenance').length;
+          const activeCount = floorUnits.filter((u) => u.status === 'in_use' || u.status === 'reserved').length;
+          const waitCount = state.waitlist.filter(
+            (w) => w.buildingId === activeBldg.id && w.floor === state.selectedFloor
+          ).length;
+          const faultCount = floorUnits.filter((u) => u.status === 'maintenance').length;
+          const bldgGenderText = activeBldg.gender === 'female' ? '女宿' : '男宿';
+
+          adminSummaryContent.innerHTML = `
+            <div class="flex flex-wrap items-center gap-4 sm:gap-6">
+              <span class="text-slate-600">正常運作 <strong class="text-slate-900 font-semibold">${normalCount} 台</strong></span>
+              <span class="text-slate-600">使用/保留中 <strong class="text-sky-700 font-semibold">${activeCount} 台</strong></span>
+              <span class="text-slate-600">候補排隊 <strong class="text-amber-700 font-semibold">${waitCount} 人</strong></span>
+              <span class="text-slate-600">待修設備 <strong class="${faultCount > 0 ? 'text-rose-600' : 'text-slate-900'} font-semibold">${faultCount} 台</strong></span>
+            </div>
+            <div class="flex items-center gap-2.5">
+              <span class="text-[11px] font-medium text-slate-400">管理視角 · ${escapeHtml(activeBldg.name)}（${bldgGenderText}） ${escapeHtml(state.selectedFloor)}</span>
+              <button
+                type="button"
+                data-action="open-building-config"
+                class="text-xs font-semibold text-slate-700 hover:text-slate-950 underline underline-offset-2"
+              >編輯棟別/樓層</button>
+            </div>
+          `;
+          return;
+        }
+
+        adminSummaryBar.classList.add('hidden');
+
+        const myUnits = state.units.filter(
+          (u) => isCurrentUser(u.userRoom, u.userName) && (u.status === 'reserved' || u.status === 'in_use')
+        );
+        const myQueues = state.waitlist.filter((w) => isCurrentUser(w.room, w.name));
+
+        if (myUnits.length === 0 && myQueues.length === 0) {
+          myStatusBar.classList.add('hidden');
+          myStatusContent.innerHTML = '';
+          return;
+        }
+
+        myStatusBar.classList.remove('hidden');
+        const rows = [];
+
+        myUnits.forEach((u) => {
+          const bName = getBuildingName(u.buildingId);
+          if (u.status === 'reserved') {
+            rows.push(`
+              <div class="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm">
+                <div class="flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                  <span class="text-slate-700">保留中：<strong>${escapeHtml(bName)} ${escapeHtml(u.name)}</strong></span>
+                  <span class="font-mono font-semibold text-amber-700">${formatMMSS(u.remainingSec)}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button type="button" data-action="check-in" data-id="${u.id}" class="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold transition-colors">確認開始使用</button>
+                  <button type="button" data-action="finish-unit" data-id="${u.id}" class="px-2.5 py-1 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 text-xs font-medium transition-colors">取消預約</button>
+                </div>
+              </div>
+            `);
+          } else {
+            rows.push(`
+              <div class="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm">
+                <div class="flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-sky-500"></span>
+                  <span class="text-slate-700">使用中：<strong>${escapeHtml(bName)} ${escapeHtml(u.name)}</strong></span>
+                  <span class="font-mono font-semibold text-slate-900">${formatMMSS(u.remainingSec)}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  ${
+                    !u.extended
+                      ? `<button type="button" data-action="extend-unit" data-id="${u.id}" class="px-2.5 py-1 rounded-lg border border-[#E2E8F0] hover:bg-slate-50 text-slate-700 text-xs font-medium transition-colors">延長 5 分鐘</button>`
+                      : `<span class="text-[11px] text-slate-400">已延長</span>`
+                  }
+                  <button type="button" data-action="finish-unit" data-id="${u.id}" class="px-3 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors">結束使用</button>
+                </div>
+              </div>
+            `);
+          }
+        });
+
+        myQueues.forEach((w) => {
+          const bName = getBuildingName(w.buildingId);
+          const sameQueue = state.waitlist.filter(
+            (item) => item.buildingId === w.buildingId && item.floor === w.floor && item.type === w.type
+          );
+          const idx = sameQueue.findIndex((item) => item.id === w.id);
+          const est = estimateWaitMins(w.buildingId, w.floor, w.type, idx);
+
+          rows.push(`
+            <div class="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                <span class="text-slate-700">候補排隊中：<strong>${escapeHtml(bName)} ${escapeHtml(w.floor)} ${FACILITY_META[w.type].label}</strong> · 第 ${idx + 1} 位</span>
+                <span class="text-xs text-slate-500">（預估約 ${est} 分鐘）</span>
+              </div>
+              <button type="button" data-action="leave-waitlist" data-id="${w.id}" class="px-2.5 py-1 rounded-lg text-rose-600 hover:bg-rose-50 text-xs font-medium transition-colors">退出排隊</button>
+            </div>
+          `);
+        });
+
+        myStatusContent.innerHTML = rows.join('');
+      }
+
+      function renderFacilitySection(type, gridId, pillId, headerActionsId) {
+        const grid = document.getElementById(gridId);
+        const pill = document.getElementById(pillId);
+        const headerActions = document.getElementById(headerActionsId);
+        if (!grid || !pill || !headerActions) return;
+
+        const activeBldg = getSelectedBuilding();
+        if (!activeBldg) {
+          pill.textContent = '空閒 0 / 0';
+          headerActions.innerHTML = '';
+          grid.innerHTML = `<div class="col-span-full bg-white rounded-2xl border border-[#E2E8F0] p-8 text-center text-xs text-slate-400">目前尚無符合性別之宿舍棟別，請聯繫管理員新增設定。</div>`;
+          return;
+        }
+
+        const buildingId = activeBldg.id;
+        const floor = state.selectedFloor;
+        const units = state.units.filter(
+          (u) => u.buildingId === buildingId && u.floor === floor && u.type === type
+        );
+        const availCount = units.filter((u) => u.status === 'available').length;
+        const queueList = state.waitlist.filter(
+          (w) => w.buildingId === buildingId && w.floor === floor && w.type === type
+        );
+
+        pill.textContent = `空閒 ${availCount} / ${units.length}`;
+        pill.className =
+          availCount > 0
+            ? 'px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/80'
+            : 'px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-500 border border-slate-200';
+
+        if (state.role === 'admin') {
+          headerActions.innerHTML = `
+            <button
+              type="button"
+              data-action="open-waitlist"
+              data-building="${buildingId}"
+              data-floor="${escapeHtml(floor)}"
+              data-type="${type}"
+              class="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-[#E2E8F0] text-xs font-medium text-slate-700 transition-colors"
+            >候補名單 (${queueList.length})</button>
+            <button
+              type="button"
+              data-action="open-add-unit"
+              data-building="${buildingId}"
+              data-floor="${escapeHtml(floor)}"
+              data-type="${type}"
+              class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition-colors"
+            >+ 新增${FACILITY_META[type].label}</button>
+          `;
+        } else {
+          const myQueueIdx = queueList.findIndex((w) => isCurrentUser(w.room, w.name));
+          if (availCount === 0 && units.length > 0) {
+            if (myQueueIdx !== -1) {
+              const myItem = queueList[myQueueIdx];
+              headerActions.innerHTML = `
+                <button
+                  type="button"
+                  data-action="leave-waitlist"
+                  data-id="${myItem.id}"
+                  class="px-3.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 text-xs font-semibold transition-colors"
+                >已排第 ${myQueueIdx + 1} 位 · 退出排隊</button>
+              `;
+            } else {
+              headerActions.innerHTML = `
+                <button
+                  type="button"
+                  data-action="join-waitlist"
+                  data-building="${buildingId}"
+                  data-floor="${escapeHtml(floor)}"
+                  data-type="${type}"
+                  class="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors"
+                >加入候補排隊（目前 ${queueList.length} 人排隊）</button>
+              `;
+            }
+          } else {
+            headerActions.innerHTML = '';
+          }
+        }
+
+        if (units.length === 0) {
+          grid.innerHTML = `<div class="col-span-full bg-white rounded-2xl border border-[#E2E8F0] p-8 text-center text-xs text-slate-400">此樓層目前尚未設定任何${FACILITY_META[type].label}。</div>`;
+          return;
+        }
+
+        grid.innerHTML = units
+          .map((unit) => {
+            const badge = STATUS_BADGE[unit.status];
+            const isMine = isCurrentUser(unit.userRoom, unit.userName);
+            const hasPendingReport = hasPendingTicketForUnit(unit.id);
+            const pendingPill = hasPendingReport
+              ? `<span class="px-1.5 py-0.2 rounded-md text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/80 shrink-0" title="此設備已有報修單等待管理員判定">待審報修</span>`
+              : '';
+
+            if (state.role === 'admin') {
+              const canDelete = unit.status === 'available' || unit.status === 'maintenance';
+              const deleteBtn = canDelete
+                ? `<button type="button" data-action="delete-unit" data-id="${unit.id}" class="text-[11px] text-slate-400 hover:text-rose-600 transition-colors shrink-0">刪除</button>`
+                : `<span class="text-[11px] text-slate-300 cursor-not-allowed shrink-0" title="使用或保留中無法刪除">刪除</span>`;
+
+              let adminMiddleLine = '';
+              if (unit.status === 'in_use') {
+                adminMiddleLine = `<p class="text-xs sm:text-sm text-slate-600">使用剩餘 <span class="font-mono text-slate-900 font-semibold">${formatMMSS(unit.remainingSec)}</span> · ${escapeHtml(unit.userRoom)}房 ${escapeHtml(unit.userName)}</p>`;
+              } else if (unit.status === 'reserved') {
+                adminMiddleLine = `<p class="text-xs sm:text-sm text-slate-600">保留倒數 <span class="font-mono text-amber-700 font-semibold">${formatMMSS(unit.remainingSec)}</span> · ${escapeHtml(unit.userRoom)}房 ${escapeHtml(unit.userName)}</p>`;
+              } else if (unit.status === 'maintenance') {
+                const reasonText = unit.faultReason || '例行檢修';
+                const reporterText = unit.reportedBy ? ` (${escapeHtml(unit.reportedBy)})` : '';
+                adminMiddleLine = `<p class="text-xs sm:text-sm text-rose-600 truncate" title="故障原因：${escapeHtml(reasonText)}${reporterText}">故障原因：${escapeHtml(reasonText)}${reporterText}</p>`;
+              } else {
+                adminMiddleLine = `<p class="text-xs sm:text-sm text-slate-500">可立即預約</p>`;
+              }
+
+              let adminBottomBtn = '';
+              if (unit.status === 'available') {
+                adminBottomBtn = `
+                  <button
+                    type="button"
+                    data-action="open-fault"
+                    data-id="${unit.id}"
+                    class="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-[#E2E8F0] text-xs sm:text-sm font-medium transition-colors"
+                  >設為維修中</button>
+                `;
+              } else if (unit.status === 'reserved' || unit.status === 'in_use') {
+                adminBottomBtn = `
+                  <button
+                    type="button"
+                    data-action="admin-force-release"
+                    data-id="${unit.id}"
+                    class="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs sm:text-sm font-semibold transition-colors"
+                  >強制釋出設備</button>
+                `;
+              } else {
+                adminBottomBtn = `
+                  <button
+                    type="button"
+                    data-action="mark-repaired"
+                    data-id="${unit.id}"
+                    class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold transition-colors"
+                  >✅ 標記修復並上線</button>
+                `;
+              }
+
+              return `
+                <article class="bg-white rounded-2xl border border-[#E2E8F0] p-5 flex flex-col justify-between gap-4">
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="flex flex-wrap items-center gap-1.5 min-w-0">
+                        <h3 class="text-sm sm:text-base font-semibold text-slate-900 truncate">${escapeHtml(unit.name)}</h3>
+                        <span class="px-2 py-0.5 rounded-full text-xs font-medium border shrink-0 ${badge.cls}">${badge.text}</span>
+                        ${pendingPill}
+                      </div>
+                      ${deleteBtn}
+                    </div>
+                    ${adminMiddleLine}
+                  </div>
+                  <div>${adminBottomBtn}</div>
+                </article>
+              `;
+            }
+
+            // 一般學生卡片：右上角「報修」按鈕導向填寫報修單彈窗
+            const reportCornerBtn = `<button type="button" data-action="open-ticket-for-unit" data-id="${unit.id}" class="text-[11px] font-medium text-slate-400 hover:text-rose-600 transition-colors shrink-0">報修</button>`;
+
+            let studentMiddleLine = '';
+            if (unit.status === 'available') {
+              studentMiddleLine = `<p class="text-xs sm:text-sm text-slate-500">可立即預約</p>`;
+            } else if (unit.status === 'reserved') {
+              studentMiddleLine = `<p class="text-xs sm:text-sm text-slate-600">保留倒數 <span class="font-mono font-semibold text-amber-700">${formatMMSS(unit.remainingSec)}</span> · ${escapeHtml(unit.userRoom)}房</p>`;
+            } else if (unit.status === 'in_use') {
+              studentMiddleLine = `<p class="text-xs sm:text-sm text-slate-600">使用剩餘 <span class="font-mono font-semibold text-slate-900">${formatMMSS(unit.remainingSec)}</span> · ${escapeHtml(unit.userRoom)}房</p>`;
+            } else {
+              const reasonText = unit.faultReason || '例行維護';
+              studentMiddleLine = `<p class="text-xs sm:text-sm text-rose-600 truncate">故障原因：${escapeHtml(reasonText)}</p>`;
+            }
+
+            let studentBottomBtn = '';
+            if (unit.status === 'available') {
+              studentBottomBtn = `
+                <button
+                  type="button"
+                  data-action="reserve-unit"
+                  data-id="${unit.id}"
+                  class="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-[0.99] text-white text-xs sm:text-sm font-medium transition-all"
+                >立即預約</button>
+              `;
+            } else if (unit.status === 'reserved') {
+              if (isMine) {
+                studentBottomBtn = `
+                  <div class="flex items-center gap-2">
+                    <button
+                      type="button"
+                      data-action="check-in"
+                      data-id="${unit.id}"
+                      class="flex-1 py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-[0.99] text-white text-xs sm:text-sm font-semibold transition-all"
+                    >確認開始使用</button>
+                    <button
+                      type="button"
+                      data-action="finish-unit"
+                      data-id="${unit.id}"
+                      class="py-2.5 px-3 rounded-xl border border-[#E2E8F0] hover:bg-slate-50 text-slate-600 text-xs font-medium transition-colors"
+                    >取消預約</button>
+                  </div>
+                `;
+              } else {
+                studentBottomBtn = `
+                  <button
+                    type="button"
+                    disabled
+                    class="w-full py-2.5 px-4 rounded-xl bg-slate-100 text-slate-400 text-xs sm:text-sm font-medium cursor-not-allowed"
+                  >已被預約保留</button>
+                `;
+              }
+            } else if (unit.status === 'in_use') {
+              if (isMine) {
+                studentBottomBtn = `
+                  <div class="flex items-center gap-2">
+                    ${
+                      !unit.extended
+                        ? `<button
+                            type="button"
+                            data-action="extend-unit"
+                            data-id="${unit.id}"
+                            class="py-2.5 px-3 rounded-xl border border-[#E2E8F0] hover:bg-slate-50 text-slate-700 text-xs font-medium transition-colors"
+                          >延長 5 分鐘</button>`
+                        : ''
+                    }
+                    <button
+                      type="button"
+                      data-action="finish-unit"
+                      data-id="${unit.id}"
+                      class="flex-1 py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-[0.99] text-white text-xs sm:text-sm font-semibold transition-all"
+                    >結束使用</button>
+                  </div>
+                `;
+              } else {
+                studentBottomBtn = `
+                  <button
+                    type="button"
+                    disabled
+                    class="w-full py-2.5 px-4 rounded-xl bg-slate-100 text-slate-400 text-xs sm:text-sm font-medium cursor-not-allowed"
+                  >目前使用中</button>
+                `;
+              }
+            } else {
+              studentBottomBtn = `
+                <button
+                  type="button"
+                  disabled
+                  class="w-full py-2.5 px-4 rounded-xl bg-slate-100 text-slate-400 text-xs sm:text-sm font-medium cursor-not-allowed"
+                >設備維修中</button>
+              `;
+            }
+
+            return `
+              <article class="bg-white rounded-2xl border border-[#E2E8F0] p-5 flex flex-col justify-between gap-4 hover:border-slate-300 transition-colors">
+                <div class="space-y-3">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex flex-wrap items-center gap-1.5 min-w-0">
+                      <h3 class="text-sm sm:text-base font-semibold text-slate-900 truncate">${escapeHtml(unit.name)}</h3>
+                      <span class="px-2 py-0.5 rounded-full text-xs font-medium border shrink-0 ${badge.cls}">${badge.text}</span>
+                      ${pendingPill}
+                    </div>
+                    ${reportCornerBtn}
+                  </div>
+                  ${studentMiddleLine}
+                </div>
+                <div>${studentBottomBtn}</div>
+              </article>
+            `;
+          })
+          .join('');
+      }
+
+      // -------------------- 渲染學生專屬「🔧 設備報修系統」 --------------------
+      function renderStudentRepairView() {
+        const filtersEl = document.getElementById('studentTicketFilters');
+        const listEl = document.getElementById('studentTicketList');
+        if (!filtersEl || !listEl) return;
+
+        const visibleBldgIds = new Set(getVisibleBuildings().map((b) => b.id));
+        const genderTickets = state.tickets.filter((t) => visibleBldgIds.has(t.buildingId));
+
+        const counts = {
+          all: genderTickets.length,
+          pending: genderTickets.filter((t) => t.status === 'pending').length,
+          approved_maintenance: genderTickets.filter((t) => t.status === 'approved_maintenance').length,
+          closed: genderTickets.filter((t) => t.status === 'resolved' || t.status === 'rejected').length
+        };
+
+        const filterDefs = [
+          { key: 'all', label: `全部報修 (${counts.all})` },
+          { key: 'pending', label: `⏳ 待管理員判定 (${counts.pending})` },
+          { key: 'approved_maintenance', label: `🔨 維修中 (${counts.approved_maintenance})` },
+          { key: 'closed', label: `已結案／駁回 (${counts.closed})` }
+        ];
+
+        filtersEl.innerHTML = filterDefs
+          .map((f) => {
+            const active = state.studentTicketFilter === f.key;
+            return `
+              <button
+                type="button"
+                data-student-ticket-filter="${f.key}"
+                class="px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                  active
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : 'bg-white text-slate-600 border-[#E2E8F0] hover:border-slate-300'
+                }"
+              >${f.label}</button>
+            `;
+          })
+          .join('');
+
+        const filtered = genderTickets.filter((t) => {
+          if (state.studentTicketFilter === 'all') return true;
+          if (state.studentTicketFilter === 'closed') return t.status === 'resolved' || t.status === 'rejected';
+          return t.status === state.studentTicketFilter;
+        });
+
+        if (filtered.length === 0) {
+          listEl.innerHTML = `
+            <div class="col-span-full bg-white rounded-2xl border border-[#E2E8F0] p-10 text-center space-y-2">
+              <p class="text-sm font-semibold text-slate-700">目前沒有符合篩選條件的報修紀錄</p>
+              <p class="text-xs text-slate-400">若發現淋浴間或洗衣機異常，歡迎點擊右上角「＋ 填寫新報修單」通報管理員。</p>
+            </div>
+          `;
+          return;
+        }
+
+        listEl.innerHTML = filtered
+          .map((t) => {
+            const st = TICKET_STATUS_META[t.status] || TICKET_STATUS_META.pending;
+            const bName = getBuildingName(t.buildingId);
+            const icon = t.unitType === 'washer' ? '🧺' : '🚿';
+            const urgencyBadge =
+              t.urgency === 'urgent'
+                ? `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200/80">🚨 緊急影響使用</span>`
+                : `<span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-600">一般報修</span>`;
+
+            const adminReplyBox = t.adminNote
+              ? `
+                <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                  <div class="flex items-center justify-between text-[11px] font-semibold text-slate-600">
+                    <span>🛠️ 管理員審核回覆</span>
+                    <span class="font-mono text-slate-400">${escapeHtml(t.reviewedAt || '')}</span>
+                  </div>
+                  <p class="text-xs text-slate-700 leading-relaxed">${escapeHtml(t.adminNote)}</p>
+                </div>
+              `
+              : `<p class="text-[11px] text-slate-400">尚未審核回覆，管理員確認後將更新處理進度。</p>`;
+
+            return `
+              <article class="bg-white rounded-2xl border border-[#E2E8F0] p-5 flex flex-col justify-between gap-4">
+                <div class="space-y-3">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                      <span class="font-mono text-xs font-bold text-slate-500">#${escapeHtml(t.id)}</span>
+                      ${urgencyBadge}
+                    </div>
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold border ${st.cls}">${st.text}</span>
+                  </div>
+
+                  <div>
+                    <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-1.5">
+                      <span>${icon}</span>
+                      <span>${escapeHtml(bName)} ${escapeHtml(t.unitName)}</span>
+                    </h3>
+                    <p class="text-xs font-semibold text-rose-700 mt-1">故障類型：${escapeHtml(t.faultType)}</p>
+                  </div>
+
+                  <p class="text-xs text-slate-600 leading-relaxed bg-slate-50/70 p-3 rounded-xl border border-slate-100">
+                    ${escapeHtml(t.description)}
+                  </p>
+                </div>
+
+                <div class="space-y-2.5 pt-2 border-t border-slate-100">
+                  <div class="flex items-center justify-between text-[11px] text-slate-400">
+                    <span>通報人：${escapeHtml(t.reporterRoom)}房 ${escapeHtml(t.reporterName)}</span>
+                    <span class="font-mono">通報時間 ${escapeHtml(t.createdAt)}</span>
+                  </div>
+                  ${adminReplyBox}
+                </div>
+              </article>
+            `;
+          })
+          .join('');
+      }
+
+      // -------------------- 渲染管理員專屬「📋 報修審核判定」 --------------------
+      function renderAdminReviewView() {
+        const filtersEl = document.getElementById('adminTicketFilters');
+        const listEl = document.getElementById('adminTicketList');
+        if (!filtersEl || !listEl) return;
+
+        const counts = {
+          pending: state.tickets.filter((t) => t.status === 'pending').length,
+          approved_maintenance: state.tickets.filter((t) => t.status === 'approved_maintenance').length,
+          closed: state.tickets.filter((t) => t.status === 'resolved' || t.status === 'rejected').length,
+          all: state.tickets.length
+        };
+
+        const filterDefs = [
+          { key: 'pending', label: `⏳ 待判定 (${counts.pending})` },
+          { key: 'approved_maintenance', label: `🔨 維修中 (${counts.approved_maintenance})` },
+          { key: 'closed', label: `已結案／駁回 (${counts.closed})` },
+          { key: 'all', label: `全部案件 (${counts.all})` }
+        ];
+
+        filtersEl.innerHTML = filterDefs
+          .map((f) => {
+            const active = state.adminTicketFilter === f.key;
+            return `
+              <button
+                type="button"
+                data-admin-ticket-filter="${f.key}"
+                class="px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                  active
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : 'bg-white text-slate-600 border-[#E2E8F0] hover:border-slate-300'
+                }"
+              >${f.label}</button>
+            `;
+          })
+          .join('');
+
+        const filtered = state.tickets.filter((t) => {
+          if (state.adminTicketFilter === 'all') return true;
+          if (state.adminTicketFilter === 'closed') return t.status === 'resolved' || t.status === 'rejected';
+          return t.status === state.adminTicketFilter;
+        });
+
+        if (filtered.length === 0) {
+          listEl.innerHTML = `
+            <div class="bg-white rounded-2xl border border-[#E2E8F0] p-10 text-center space-y-1.5">
+              <p class="text-sm font-semibold text-slate-700">目前此分類下無報修案件</p>
+              <p class="text-xs text-slate-400">可切換上方篩選標籤檢視其他歷史報修紀錄。</p>
+            </div>
+          `;
+          return;
+        }
+
+        listEl.innerHTML = filtered
+          .map((t) => {
+            const st = TICKET_STATUS_META[t.status] || TICKET_STATUS_META.pending;
+            const bldg = state.buildings.find((b) => b.id === t.buildingId);
+            const bName = bldg ? bldg.name : '未知棟別';
+            const genderTag =
+              bldg && bldg.gender === 'female'
+                ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/80">女宿</span>`
+                : `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-200/80">男宿</span>`;
+
+            const unit = state.units.find((u) => u.id === t.unitId);
+            const unitStatusBadge = unit
+              ? (() => {
+                  const ub = STATUS_BADGE[unit.status];
+                  return `<span class="px-2 py-0.5 rounded-full text-[11px] font-medium border ${ub.cls}">目前設備：${ub.text}</span>`;
+                })()
+              : `<span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-400">設備已移除</span>`;
+
+            const urgencyBadge =
+              t.urgency === 'urgent'
+                ? `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200/80">🚨 緊急影響使用</span>`
+                : `<span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-600">一般報修</span>`;
+
+            let actionAreaHtml = '';
+            if (t.status === 'pending') {
+              actionAreaHtml = `
+                <div class="pt-3 border-t border-slate-100 space-y-3">
+                  <div>
+                    <label for="reviewNote-${t.id}" class="block text-[11px] font-semibold text-slate-600 mb-1">管理員判定備註（將顯示於學生端進度追蹤）</label>
+                    <input
+                      type="text"
+                      id="reviewNote-${t.id}"
+                      maxlength="120"
+                      placeholder="輸入現場確認結果或預計修復時間（留白將自動帶入預設說明）"
+                      class="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] text-xs text-slate-900 focus:outline-none focus:border-slate-900"
+                    />
+                  </div>
+                  <div class="flex flex-wrap items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      data-review-action="reject"
+                      data-ticket-id="${t.id}"
+                      class="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-[#E2E8F0] text-xs font-semibold transition-colors"
+                    >👌 判定正常（駁回報修）</button>
+                    <button
+                      type="button"
+                      data-review-action="approve_fault"
+                      data-ticket-id="${t.id}"
+                      class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition-colors"
+                    >🔨 判定故障（轉為維修中）</button>
+                  </div>
+                </div>
+              `;
+            } else if (t.status === 'approved_maintenance') {
+              actionAreaHtml = `
+                <div class="pt-3 border-t border-slate-100 space-y-3">
+                  <div>
+                    <label for="reviewNote-${t.id}" class="block text-[11px] font-semibold text-slate-600 mb-1">維修進度／結案備註</label>
+                    <input
+                      type="text"
+                      id="reviewNote-${t.id}"
+                      value="${escapeHtml(t.adminNote || '')}"
+                      maxlength="120"
+                      placeholder="輸入修復完成說明..."
+                      class="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] text-xs text-slate-900 focus:outline-none focus:border-slate-900"
+                    />
+                  </div>
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[11px] text-slate-400">審核時間：${escapeHtml(t.reviewedAt || '--:--')}</span>
+                    <button
+                      type="button"
+                      data-review-action="resolve"
+                      data-ticket-id="${t.id}"
+                      class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors"
+                    >✅ 標記已修復並上線</button>
+                  </div>
+                </div>
+              `;
+            } else {
+              actionAreaHtml = `
+                <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span class="text-slate-600"><strong>判定備註：</strong>${escapeHtml(t.adminNote || '無')}</span>
+                  <span class="font-mono text-[11px] text-slate-400">處理時間 ${escapeHtml(t.reviewedAt || '--:--')}</span>
+                </div>
+              `;
+            }
+
+            return `
+              <article class="bg-white rounded-2xl border border-[#E2E8F0] p-5 space-y-3.5">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="font-mono text-xs font-bold text-slate-600">#${escapeHtml(t.id)}</span>
+                    ${urgencyBadge}
+                    <span class="font-mono text-[11px] text-slate-400">通報時間 ${escapeHtml(t.createdAt)}</span>
+                  </div>
+                  <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold border ${st.cls}">${st.text}</span>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="flex flex-wrap items-center gap-2">
+                    ${genderTag}
+                    <h3 class="text-sm sm:text-base font-bold text-slate-900">${escapeHtml(bName)} ${escapeHtml(t.unitName)}</h3>
+                    ${unitStatusBadge}
+                  </div>
+                  <span class="text-xs text-slate-500">通報人：<strong class="text-slate-800">${escapeHtml(t.reporterRoom)}房 ${escapeHtml(t.reporterName)}</strong></span>
+                </div>
+
+                <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200/70 space-y-1">
+                  <p class="text-xs font-bold text-rose-700">故障類型：${escapeHtml(t.faultType)}</p>
+                  <p class="text-xs sm:text-sm text-slate-700 leading-relaxed">${escapeHtml(t.description)}</p>
+                </div>
+
+                ${actionAreaHtml}
+              </article>
+            `;
+          })
+          .join('');
+      }
+
+      function renderAdminLogsSection() {
+        const section = document.getElementById('adminLogsSection');
+        const bodyEl = document.getElementById('adminLogsBody');
+        const countBadge = document.getElementById('logsCountBadge');
+        const chevron = document.getElementById('logsChevron');
+        if (!section || !bodyEl) return;
+
+        if (state.role !== 'admin') {
+          section.classList.add('hidden');
+          return;
+        }
+
+        section.classList.remove('hidden');
+        countBadge.textContent = String(state.logs.length);
+        chevron.textContent = state.logsCollapsed ? '展開' : '收合';
+        bodyEl.classList.toggle('hidden', state.logsCollapsed);
+
+        if (state.logs.length === 0) {
+          bodyEl.innerHTML = `<p class="p-6 text-center text-xs text-slate-400">尚無任何系統或報修紀錄。</p>`;
+          return;
+        }
+
+        bodyEl.innerHTML = state.logs
+          .map((log) => {
+            const badgeCls =
+              log.category === '學生報修'
+                ? 'bg-rose-50 text-rose-700 border-rose-200/80'
+                : log.category === '報修判定'
+                ? 'bg-indigo-50 text-indigo-700 border-indigo-200/80'
+                : log.category === '維修完成'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
+                : log.category === '棟別設定' || log.category === '樓層設定' || log.category === '帳密設定'
+                ? 'bg-amber-50 text-amber-700 border-amber-200/80'
+                : 'bg-slate-100 text-slate-600 border-slate-200';
+
+            return `
+              <div class="px-4 sm:px-5 py-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div class="flex items-center gap-2.5 min-w-0">
+                  <span class="font-mono text-slate-400 shrink-0">${escapeHtml(log.time)}</span>
+                  <span class="px-2 py-0.5 rounded-md border font-medium shrink-0 ${badgeCls}">${escapeHtml(log.category)}</span>
+                  <span class="text-slate-700 truncate">${escapeHtml(log.message)}</span>
+                </div>
+              </div>
+            `;
+          })
+          .join('');
+      }
+
+      function renderDemoPopover() {
+        const popover = document.getElementById('demoPopover');
+        const btn = document.getElementById('demoToggleBtn');
+        if (!popover || !btn) return;
+        popover.classList.toggle('hidden', !state.demoOpen);
+        btn.setAttribute('aria-expanded', String(state.demoOpen));
+      }
+
+      // -------------------- 事件綁定 --------------------
+      function bindEvents() {
+        // 全局淺色 / 深色模式切換按鈕
+        document.body.addEventListener('click', (e) => {
+          const themeBtn = e.target.closest('[data-theme-choice]');
+          if (!themeBtn) return;
+          applyTheme(themeBtn.dataset.themeChoice, true);
+        });
+
+        // 歡迎畫面：分頁切換
+        document.getElementById('welcomeTabStudent').addEventListener('click', () => {
+          welcomeState.tab = 'student';
+          renderWelcomeScreen();
+        });
+
+        document.getElementById('welcomeTabAdmin').addEventListener('click', () => {
+          welcomeState.tab = 'admin';
+          document.getElementById('setupAdminError').classList.add('hidden');
+          renderWelcomeScreen();
+        });
+
+        // 歡迎畫面：性別大按鈕卡片選擇
+        document.querySelectorAll('.setup-gender-card').forEach((card) => {
+          card.addEventListener('click', () => {
+            welcomeState.selectedGender = card.dataset.setupGender;
+            document.getElementById('setupStudentError').classList.add('hidden');
+            renderWelcomeScreen();
+          });
+        });
+
+        // 歡迎畫面：住宿生表單送出
+        document.getElementById('welcomeStudentForm').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const name = document.getElementById('setupNameInput').value.trim();
+          const room = document.getElementById('setupRoomInput').value.trim();
+          const gender = welcomeState.selectedGender;
+          const errEl = document.getElementById('setupStudentError');
+
+          if (!name || !room || !gender) {
+            errEl.textContent = '請完整填寫「姓名」、「房號」並選擇「性別」後再進入系統。';
+            errEl.classList.remove('hidden');
+            return;
+          }
+
+          errEl.classList.add('hidden');
+          enterAsStudent(name, room, gender);
+        });
+
+        // 歡迎畫面：男生／女生範例一鍵填入並進入
+        document.getElementById('quickMaleDemoBtn').addEventListener('click', () => {
+          enterAsStudent('王小明', '302', 'male');
+        });
+
+        document.getElementById('quickFemaleDemoBtn').addEventListener('click', () => {
+          enterAsStudent('林雅婷', '205', 'female');
+        });
+
+        // 歡迎畫面：顯示/隱藏密碼
+        document.getElementById('toggleLoginPassBtn').addEventListener('click', () => {
+          welcomeState.showLoginPassword = !welcomeState.showLoginPassword;
+          const passInput = document.getElementById('setupAdminPassInput');
+          const btn = document.getElementById('toggleLoginPassBtn');
+          passInput.type = welcomeState.showLoginPassword ? 'text' : 'password';
+          btn.textContent = welcomeState.showLoginPassword ? '🙈 隱藏密碼' : '👁️ 顯示密碼';
+        });
+
+        // 歡迎畫面：管理員登入表單送出（驗證 localStorage 儲存的管理員帳密）
+        document.getElementById('welcomeAdminForm').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const user = document.getElementById('setupAdminUserInput').value.trim();
+          const pass = document.getElementById('setupAdminPassInput').value;
+          const errEl = document.getElementById('setupAdminError');
+
+          if (user === state.adminCredentials.username && pass === state.adminCredentials.password) {
+            errEl.classList.add('hidden');
+            enterAsAdmin();
+          } else {
+            errEl.textContent = '管理員帳號或密碼錯誤，請重新確認。';
+            errEl.classList.remove('hidden');
+          }
+        });
+
+        // 歡迎畫面：帶入目前儲存的管理員帳密
+        document.getElementById('welcomeFillAdminDemoBtn').addEventListener('click', () => {
+          document.getElementById('setupAdminUserInput').value = state.adminCredentials.username;
+          document.getElementById('setupAdminPassInput').value = state.adminCredentials.password;
+          document.getElementById('setupAdminError').classList.add('hidden');
+        });
+
+        // 歡迎畫面：恢復預設帳密（防止展示忘記密碼）
+        document.getElementById('welcomeResetDefaultAdminBtn').addEventListener('click', () => {
+          state.adminCredentials = { ...DEFAULT_ADMIN_CREDS };
+          document.getElementById('setupAdminUserInput').value = DEFAULT_ADMIN_CREDS.username;
+          document.getElementById('setupAdminPassInput').value = DEFAULT_ADMIN_CREDS.password;
+          document.getElementById('setupAdminError').classList.add('hidden');
+          saveState();
+          renderWelcomeScreen();
+          showLineToast('已恢復預設管理員帳密', '帳號已重設為 admin，密碼為 admin123。');
+        });
+
+        // 導覽列：切換身分（返回入口畫面）
+        document.getElementById('switchIdentityBtn').addEventListener('click', () => {
+          if (state.role === 'admin') {
+            adminAuthenticated = false;
+            openWelcomeScreen('admin', null);
+          } else {
+            openWelcomeScreen('student', state.currentUser);
+          }
+        });
+
+        // 學生視角主分頁切換
+        document.getElementById('studentMainTabs').addEventListener('click', (e) => {
+          const btn = e.target.closest('[data-student-tab]');
+          if (!btn) return;
+          state.studentTab = btn.dataset.studentTab;
+          saveState();
+          renderAll();
+        });
+
+        // 管理員視角主分頁切換
+        document.getElementById('adminMainTabs').addEventListener('click', (e) => {
+          const btn = e.target.closest('[data-admin-tab]');
+          if (!btn) return;
+          state.adminTab = btn.dataset.adminTab;
+          saveState();
+          renderAll();
+        });
+
+        // 管理員設定按鈕：棟別與樓層設定 / 帳密設定
+        document.getElementById('openBuildingConfigBtn').addEventListener('click', openBuildingConfigModal);
+        document.getElementById('openAdminAuthModalBtn').addEventListener('click', openAdminAuthModal);
+
+        // 管理員帳密設定表單送出與顯示密碼切換
+        document.getElementById('toggleAuthModalPassBtn').addEventListener('click', () => {
+          modalContext.showAuthModalPasswords = !modalContext.showAuthModalPasswords;
+          const type = modalContext.showAuthModalPasswords ? 'text' : 'password';
+          ['authCurrentPassInput', 'authNewPassInput', 'authConfirmPassInput'].forEach((id) => {
+            document.getElementById(id).type = type;
+          });
+          document.getElementById('toggleAuthModalPassBtn').textContent = modalContext.showAuthModalPasswords
+            ? '🙈 隱藏密碼'
+            : '👁️ 顯示密碼';
+        });
+
+        document.getElementById('adminAuthForm').addEventListener('submit', (e) => {
+          e.preventDefault();
+          submitAdminAuthUpdate();
+        });
+
+        // 學生報修系統：開啟新報修單 / 篩選
+        document.getElementById('openNewTicketBtn').addEventListener('click', () => openNewTicketModal(''));
+
+        document.getElementById('studentTicketFilters').addEventListener('click', (e) => {
+          const btn = e.target.closest('[data-student-ticket-filter]');
+          if (!btn) return;
+          state.studentTicketFilter = btn.dataset.studentTicketFilter;
+          saveState();
+          renderStudentRepairView();
+        });
+
+        // 新報修單彈窗連動與送出
+        document.getElementById('ticketBuildingSelect').addEventListener('change', (e) => {
+          const bId = e.target.value;
+          populateTicketFloors(bId, '');
+          const fl = document.getElementById('ticketFloorSelect').value;
+          populateTicketUnits(bId, fl, '');
+        });
+
+        document.getElementById('ticketFloorSelect').addEventListener('change', (e) => {
+          const bId = document.getElementById('ticketBuildingSelect').value;
+          populateTicketUnits(bId, e.target.value, '');
+        });
+
+        document.getElementById('fillSampleTicketBtn').addEventListener('click', () => {
+          const faultType = document.getElementById('ticketFaultTypeSelect').value;
+          const descInput = document.getElementById('ticketDescriptionInput');
+          descInput.value = FAULT_SAMPLE_DESCRIPTIONS[faultType] || FAULT_SAMPLE_DESCRIPTIONS['其他故障'];
+          document.getElementById('newTicketError').classList.add('hidden');
+        });
+
+        document.getElementById('newTicketForm').addEventListener('submit', (e) => {
+          e.preventDefault();
+          submitNewTicket();
+        });
+
+        // 管理員報修審核：篩選與判定按鈕
+        document.getElementById('adminTicketFilters').addEventListener('click', (e) => {
+          const btn = e.target.closest('[data-admin-ticket-filter]');
+          if (!btn) return;
+          state.adminTicketFilter = btn.dataset.adminTicketFilter;
+          saveState();
+          renderAdminReviewView();
+        });
+
+        document.getElementById('adminTicketList').addEventListener('click', (e) => {
+          const btn = e.target.closest('[data-review-action]');
+          if (!btn) return;
+          const action = btn.dataset.reviewAction;
+          const ticketId = btn.dataset.ticketId;
+          const noteInput = document.getElementById(`reviewNote-${ticketId}`);
+          const noteVal = noteInput ? noteInput.value : '';
+          reviewTicketDecision(ticketId, action, noteVal);
+        });
+
+        // 棟別與樓層切換
+        document.getElementById('buildingTabs').addEventListener('click', (e) => {
+          const btn = e.target.closest('[data-select-building]');
+          if (!btn) return;
+          state.selectedBuildingId = btn.dataset.selectBuilding;
+          const bldg = getSelectedBuilding();
+          if (bldg && !bldg.floors.includes(state.selectedFloor)) {
+            state.selectedFloor = bldg.floors[0] || '1F';
+          }
+          saveState();
+          renderAll();
+        });
+
+        document.getElementById('floorPills').addEventListener('click', (e) => {
+          const btn = e.target.closest('[data-select-floor]');
+          if (!btn) return;
+          state.selectedFloor = btn.dataset.selectFloor;
+          saveState();
+          renderAll();
+        });
+
+        // 新增棟別表單
+        document.getElementById('addBuildingForm').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const nameInput = document.getElementById('newBuildingNameInput');
+          const floorsInput = document.getElementById('newBuildingFloorsInput');
+          const autoCheck = document.getElementById('newBuildingAutoUnits');
+          const checkedGender = document.querySelector('input[name="newBuildingGender"]:checked');
+          const gender = checkedGender ? checkedGender.value : 'male';
+
+          addNewBuilding(nameInput.value, gender, floorsInput.value, autoCheck.checked);
+          nameInput.value = '';
+          floorsInput.value = '2F, 3F, 4F';
+        });
+
+        // 棟別設定彈窗內的互動事件委派
+        document.getElementById('buildingModal').addEventListener('click', (e) => {
+          const selectBldgBtn = e.target.closest('[data-config-select-bldg]');
+          if (selectBldgBtn) {
+            modalContext.configBuildingId = selectBldgBtn.dataset.configSelectBldg;
+            modalContext.confirmDeleteBuildingId = null;
+            modalContext.confirmDeleteFloorName = null;
+            modalContext.editingFloorName = null;
+            renderBuildingConfigModal();
+            return;
+          }
+
+          if (e.target.id === 'saveBuildingMetaBtn') {
+            const input = document.getElementById('renameBuildingInput');
+            const genderRadio = document.querySelector('input[name="editBuildingGender"]:checked');
+            if (input) {
+              updateBuildingMeta(
+                modalContext.configBuildingId,
+                input.value,
+                genderRadio ? genderRadio.value : 'male'
+              );
+            }
+            return;
+          }
+
+          if (e.target.id === 'askDeleteBuildingBtn') {
+            modalContext.confirmDeleteBuildingId = modalContext.configBuildingId;
+            renderBuildingConfigModal();
+            return;
+          }
+
+          if (e.target.id === 'cancelDeleteBuildingBtn') {
+            modalContext.confirmDeleteBuildingId = null;
+            renderBuildingConfigModal();
+            return;
+          }
+
+          if (e.target.id === 'confirmDeleteBuildingBtn') {
+            deleteBuilding(modalContext.configBuildingId);
+            return;
+          }
+
+          const moveBtn = e.target.closest('[data-move-floor]');
+          if (moveBtn) {
+            moveFloorInBuilding(
+              modalContext.configBuildingId,
+              moveBtn.dataset.moveFloor,
+              Number(moveBtn.dataset.dir)
+            );
+            return;
+          }
+
+          const editBtn = e.target.closest('[data-start-edit-floor]');
+          if (editBtn) {
+            modalContext.editingFloorName = editBtn.dataset.startEditFloor;
+            modalContext.confirmDeleteFloorName = null;
+            renderBuildingConfigModal();
+            setTimeout(() => {
+              const inp = document.getElementById('inlineEditFloorInput');
+              if (inp) inp.focus();
+            }, 30);
+            return;
+          }
+
+          const saveFloorBtn = e.target.closest('[data-save-floor-rename]');
+          if (saveFloorBtn) {
+            const inp = document.getElementById('inlineEditFloorInput');
+            if (inp) {
+              renameFloorInBuilding(modalContext.configBuildingId, saveFloorBtn.dataset.saveFloorRename, inp.value);
+            }
+            return;
+          }
+
+          if (e.target.closest('[data-cancel-floor-rename]')) {
+            modalContext.editingFloorName = null;
+            renderBuildingConfigModal();
+            return;
+          }
+
+          const askDelFloorBtn = e.target.closest('[data-ask-delete-floor]');
+          if (askDelFloorBtn) {
+            modalContext.confirmDeleteFloorName = askDelFloorBtn.dataset.askDeleteFloor;
+            modalContext.editingFloorName = null;
+            renderBuildingConfigModal();
+            return;
+          }
+
+          if (e.target.closest('[data-cancel-delete-floor]')) {
+            modalContext.confirmDeleteFloorName = null;
+            renderBuildingConfigModal();
+            return;
+          }
+
+          const confirmDelFloorBtn = e.target.closest('[data-confirm-delete-floor]');
+          if (confirmDelFloorBtn) {
+            deleteFloorFromBuilding(modalContext.configBuildingId, confirmDelFloorBtn.dataset.confirmDeleteFloor);
+          }
+        });
+
+        document.getElementById('buildingModal').addEventListener('change', (e) => {
+          if (e.target.name === 'editBuildingGender') {
+            const bldg = state.buildings.find((b) => b.id === modalContext.configBuildingId);
+            if (bldg) {
+              bldg.gender = e.target.value === 'female' ? 'female' : 'male';
+              renderBuildingConfigModal();
+            }
+          }
+        });
+
+        document.getElementById('buildingModal').addEventListener('submit', (e) => {
+          if (e.target.id === 'addFloorToBuildingForm') {
+            e.preventDefault();
+            const floorInput = document.getElementById('newFloorNameInput');
+            const autoCheck = document.getElementById('newFloorAutoUnits');
+            if (floorInput) {
+              addFloorToBuilding(modalContext.configBuildingId, floorInput.value, autoCheck ? autoCheck.checked : true);
+            }
+          }
+        });
+
+        // 管理員手動設為維修中確認按鈕
+        document.getElementById('confirmFaultBtn').addEventListener('click', submitAdminManualFault);
+
+        // 管理員候補彈窗
+        document.getElementById('waitlistModalBody').addEventListener('click', (e) => {
+          const btn = e.target.closest('[data-admin-remove-wait]');
+          if (!btn) return;
+          leaveWaitlist(btn.dataset.adminRemoveWait, true);
+          renderWaitlistModalContent();
+        });
+
+        document.getElementById('clearCategoryWaitlistBtn').addEventListener('click', () => {
+          const { waitlistBuildingId: buildingId, waitlistFloor: floor, waitlistType: type } = modalContext;
+          const bName = getBuildingName(buildingId);
+          const count = state.waitlist.filter(
+            (w) => w.buildingId === buildingId && w.floor === floor && w.type === type
+          ).length;
+          if (count === 0) return;
+          state.waitlist = state.waitlist.filter(
+            (w) => !(w.buildingId === buildingId && w.floor === floor && w.type === type)
+          );
+          addSystemLog('管理員操作', `清空 ${bName} ${floor} ${FACILITY_META[type].label}候補名單（共 ${count} 人）`);
+          saveState();
+          renderAll();
+          renderWaitlistModalContent();
+        });
+
+        // 管理員新增設備表單
+        document.getElementById('addUnitForm').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const input = document.getElementById('newUnitNameInput');
+          addNewUnit(input.value);
+          closeModal('addUnitModal');
+        });
+
+        // 收合 / 展開紀錄與清空紀錄
+        document.getElementById('toggleLogsBtn').addEventListener('click', () => {
+          state.logsCollapsed = !state.logsCollapsed;
+          saveState();
+          renderAdminLogsSection();
+        });
+
+        document.getElementById('clearLogsBtn').addEventListener('click', () => {
+          state.logs = [];
+          saveState();
+          renderAdminLogsSection();
+        });
+
+        // 關閉彈窗按鈕與背景點擊
+        document.querySelectorAll('[data-close-modal]').forEach((btn) => {
+          btn.addEventListener('click', () => closeModal(btn.dataset.closeModal));
+        });
+
+        ['newTicketModal', 'adminAuthModal', 'faultModal', 'waitlistModal', 'addUnitModal', 'buildingModal'].forEach((modalId) => {
+          const overlay = document.getElementById(modalId);
+          overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) closeModal(modalId);
+          });
+        });
+
+        // 全域卡片與狀態列動作委派
+        document.body.addEventListener('click', (e) => {
+          const target = e.target.closest('[data-action]');
+          if (!target) return;
+
+          const action = target.dataset.action;
+          const id = target.dataset.id;
+
+          if (action === 'reserve-unit') reserveUnit(id);
+          else if (action === 'check-in') checkInUnit(id);
+          else if (action === 'extend-unit') extendUnitOnce(id);
+          else if (action === 'finish-unit') cancelOrFinishUnit(id);
+          else if (action === 'join-waitlist') joinWaitlist(target.dataset.building, target.dataset.floor, target.dataset.type);
+          else if (action === 'leave-waitlist') leaveWaitlist(id, false);
+          else if (action === 'open-ticket-for-unit') openNewTicketModal(id);
+          else if (action === 'open-fault') openFaultModal(id);
+          else if (action === 'admin-force-release') adminForceRelease(id);
+          else if (action === 'mark-repaired') markUnitRepaired(id);
+          else if (action === 'open-waitlist') openWaitlistModal(target.dataset.building, target.dataset.floor, target.dataset.type);
+          else if (action === 'open-add-unit') openAddUnitModal(target.dataset.building, target.dataset.floor, target.dataset.type);
+          else if (action === 'delete-unit') deleteUnit(id);
+          else if (action === 'open-building-config') openBuildingConfigModal();
+        });
+
+        // 展示控制懸浮鈕
+        document.getElementById('demoToggleBtn').addEventListener('click', () => {
+          state.demoOpen = !state.demoOpen;
+          saveState();
+          renderDemoPopover();
+        });
+
+        document.getElementById('demoPlus5Btn').addEventListener('click', () => {
+          tickSeconds(5 * 60);
+          showLineToast('展示時間快轉 +5 分鐘', '所有倒數計時已向前推進 5 分鐘。');
+        });
+
+        document.getElementById('demoPlus15Btn').addEventListener('click', () => {
+          tickSeconds(15 * 60);
+          showLineToast('展示時間快轉 +15 分鐘', '所有倒數計時已向前推進 15 分鐘。');
+        });
+
+        document.getElementById('demoPlus40Btn').addEventListener('click', () => {
+          tickSeconds(40 * 60);
+          showLineToast('展示時間快轉 +40 分鐘', '所有倒數計時已向前推進 40 分鐘（完整洗衣週期）。');
+        });
+
+        document.getElementById('demoCompleteOneBtn').addEventListener('click', () => {
+          simulateOneCompletion();
+        });
+
+        document.getElementById('demoResetBtn').addEventListener('click', () => {
+          adminAuthenticated = false;
+          localStorage.removeItem(STORAGE_KEY);
+          state = getInitialState();
+          welcomeState = { tab: 'student', selectedGender: '', showLoginPassword: false };
+          saveState();
+          renderAll();
+          showLineToast('已重置預設模擬資料', '所有設備、報修單、男女宿設定與預設帳密已恢復初始狀態。');
+        });
+      }
+
+      initThemeSystem();
+      bindEvents();
+      renderAll();
+    })();
+  </script>
+</body>
+</html>
